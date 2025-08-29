@@ -100,6 +100,40 @@ def main():
     # plan to goal
     plan_and_execute(cobot, arm, logger, sleep_time=1.0)
 
+    ###########################################################################
+    # Plan 4 - set goal state with constraints
+    ###########################################################################
+
+    # set plan start state to current state
+    arm.set_start_state_to_current_state()
+
+    # set constraints message
+    from moveit.core.kinematic_constraints import construct_joint_constraint
+
+    joint_values = {
+        "joint1": math.radians(-55.4),
+        "joint2": math.radians(27.0),
+        "joint3": math.radians(45.0),
+        "joint4": math.radians(12.0),
+        "joint5": math.radians(17.0),
+        "joint6": math.radians(-12.8),
+        }
+
+    robot_model = cobot.get_robot_model()
+    robot_state = RobotState(robot_model)
+
+    robot_state.joint_positions = joint_values
+    joint_constraint = construct_joint_constraint(
+        robot_state=robot_state,
+        joint_model_group=cobot.get_robot_model().get_joint_model_group("lite6"),
+        )
+    arm.set_goal_state(motion_plan_constraints=[joint_constraint])
+
+    # plan to goal
+    plan_and_execute(cobot, arm, logger, sleep_time=8.0)
+
+    log_positions(robot_state, logger)
+
     ############################################################################
     ## Plan 2 - set goal state with RobotState object
     ############################################################################
@@ -120,7 +154,7 @@ def main():
     logger.info("Set goal state to the initialized robot state")
     arm.set_goal_state(robot_state=robot_state)
 
-    # plan to goal
+    # plan to goal - UNCOMMENT ME TO RUN!
     #plan_and_execute(cobot, arm, logger)
 
     log_positions(robot_state, logger)
@@ -171,40 +205,6 @@ def main():
         # plan to goal
         plan_and_execute(cobot, arm, logger)
 
-    ############################################################################
-    ## Plan 4 - set goal state with constraints
-    ############################################################################
-
-    ## set plan start state to current state
-    #arm.set_start_state_to_current_state()
-
-    ## set constraints message
-    #from moveit.core.kinematic_constraints import construct_joint_constraint
-
-    # marios: multiply by 3.14
-    #joint_values = {
-    #    "joint1": -55.4/180.,
-    #    "joint2": 27.0/180.,
-    #    "joint3": 45.0/180.,
-    #    "joint4": 12.0/180.,
-    #    "joint5": 17.0/180.,
-    #    "joint6": -12.8/180,
-    #    }
-
-    #robot_model = cobot.get_robot_model()
-    #robot_state = RobotState(robot_model)
-
-    #robot_state.joint_positions = joint_values
-    #joint_constraint = construct_joint_constraint(
-    #    robot_state=robot_state,
-    #    joint_model_group=cobot.get_robot_model().get_joint_model_group("lite6"),
-    #    )
-    #arm.set_goal_state(motion_plan_constraints=[joint_constraint])
-
-    ## plan to goal
-    #plan_and_execute(cobot, arm, logger, sleep_time=8.0)
-
-    #log_positions(robot_state, logger)
 
     ############################################################################
     ## Plan 5 - Planning with Multiple Pipelines simultaneously
