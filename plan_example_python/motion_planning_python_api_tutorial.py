@@ -4,6 +4,7 @@ A script to outline the fundamentals of the moveit_py motion planning API.
 """
 
 import time
+import math
 import code
 
 # generic ros libraries
@@ -17,6 +18,19 @@ from moveit.planning import (
     MultiPipelinePlanRequestParameters,
     )
 
+
+def euler_to_quaternion(yaw, pitch, roll):
+    """
+    Convert Euler angles (yaw, pitch, roll) to a quaternion.
+    Assumes ZYX intrinsic rotation order.
+    Angles should be in radians.
+    """
+    qx = math.sin(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) - math.cos(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
+    qy = math.cos(roll/2) * math.sin(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.cos(pitch/2) * math.sin(yaw/2)
+    qz = math.cos(roll/2) * math.cos(pitch/2) * math.sin(yaw/2) - math.sin(roll/2) * math.sin(pitch/2) * math.cos(yaw/2)
+    qw = math.cos(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
+
+    return [qw, qx, qy, qz]
 
 def plan_and_execute(
         robot,
@@ -107,7 +121,7 @@ def main():
     arm.set_goal_state(robot_state=robot_state)
 
     # plan to goal
-    plan_and_execute(cobot, arm, logger)
+    #plan_and_execute(cobot, arm, logger)
 
     log_positions(robot_state, logger)
 
@@ -117,27 +131,45 @@ def main():
     # TODO figure out the coordinate system
 
     # set plan start state to current state
-    arm.set_start_state_to_current_state()
 
     # set pose goal with PoseStamped message
     from geometry_msgs.msg import PoseStamped
 
-    pose_goal = PoseStamped()
-    pose_goal.header.frame_id = "link_base"
-    pose_goal.pose.orientation.w = 1.0
-    pose_goal.pose.orientation.x = 1.0
-    #pose_goal.pose.orientation.y = .5
-    #pose_goal.pose.orientation.z = -1.0
-    #these are METERS! don't push your luck
-    pose_goal.pose.position.x = 0.2
-    pose_goal.pose.position.y = 0.0
-    pose_goal.pose.position.z = 0.4
-    arm.set_goal_state(
-        # that or joint6_flange maybe?
-        pose_stamped_msg=pose_goal, pose_link="link6")
+    ypra = [ ]
+    ypra.extend([ [0, 0, i*45] for i in range(1,8)])
+    ypra.extend([ [i*45, 0, 0] for i in range(1,8)])
+    ypra.extend([ [0, i*45, 0] for i in range(1,8)])
+    ypra.append([0, 0, 0])
 
-    # plan to goal
-    plan_and_execute(cobot, arm, logger, sleep_time=8.0)
+    for target in ypra:
+        arm.set_start_state_to_current_state()
+        #yaw, pitch, roll angles
+        quaternion = euler_to_quaternion(
+                math.radians(target[0]),
+                math.radians(target[1]),
+                math.radians(target[2]))
+        logger.info(f"target yaw pitch roll: {target}")
+        logger.info(f"quaternion raw values: {quaternion}")
+
+        pose_goal = PoseStamped()
+        pose_goal.header.frame_id = "link_base"
+        pose_goal.pose.orientation.w = quaternion[0]
+        pose_goal.pose.orientation.x = quaternion[1]
+        pose_goal.pose.orientation.y = quaternion[2]
+        pose_goal.pose.orientation.z = quaternion[3]
+
+        logger.info(f"pose type: {type(pose_goal.pose.orientation)}")
+
+        #these are METERS! don't push your luck
+        pose_goal.pose.position.x = 0.0
+        pose_goal.pose.position.y = 0.0
+        pose_goal.pose.position.z = 0.5
+        arm.set_goal_state(
+            # that or joint6_flange maybe?
+            pose_stamped_msg=pose_goal, pose_link="link6")
+
+        # plan to goal
+        plan_and_execute(cobot, arm, logger)
 
     ############################################################################
     ## Plan 4 - set goal state with constraints
@@ -149,6 +181,7 @@ def main():
     ## set constraints message
     #from moveit.core.kinematic_constraints import construct_joint_constraint
 
+    # marios: multiply by 3.14
     #joint_values = {
     #    "joint1": -55.4/180.,
     #    "joint2": 27.0/180.,
