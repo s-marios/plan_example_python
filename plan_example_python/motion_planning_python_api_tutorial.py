@@ -81,8 +81,8 @@ def main():
     logger = get_logger("moveit_py.pose_goal")
 
     # instantiate MoveItPy instance and get planning component
-    cobot = MoveItPy(node_name="moveit_py")
-    arm = cobot.get_planning_component("lite6")
+    moveit = MoveItPy(node_name="moveit_py")
+    arm = moveit.get_planning_component("lite6")
     logger.info("MoveItPy instance created")
     time.sleep(5)
     logger.info("Sleeping for 5 secs...")
@@ -98,7 +98,7 @@ def main():
     arm.set_goal_state(configuration_name="home")
 
     # plan to goal
-    plan_and_execute(cobot, arm, logger, sleep_time=1.0)
+    plan_and_execute(moveit, arm, logger, sleep_time=1.0)
 
     ###########################################################################
     # Plan 4 - set goal state with constraints
@@ -119,27 +119,33 @@ def main():
         "joint6": math.radians(-12.8),
         }
 
-    robot_model = cobot.get_robot_model()
+    robot_model = moveit.get_robot_model()
     robot_state = RobotState(robot_model)
 
     robot_state.joint_positions = joint_values
     joint_constraint = construct_joint_constraint(
         robot_state=robot_state,
-        joint_model_group=cobot.get_robot_model().get_joint_model_group("lite6"),
+        joint_model_group=moveit.get_robot_model().get_joint_model_group("lite6"),
         )
     arm.set_goal_state(motion_plan_constraints=[joint_constraint])
 
     # plan to goal
-    plan_and_execute(cobot, arm, logger)
+    plan_and_execute(moveit, arm, logger)
 
     log_positions(robot_state, logger)
+
+    ###########################################################################
+    # Plan 5 - Spawn virtual object
+    ###########################################################################
+
+
 
     ############################################################################
     ## Plan 2 - set goal state with RobotState object
     ############################################################################
 
     ## instantiate a RobotState instance using the current robot model
-    robot_model = cobot.get_robot_model()
+    robot_model = moveit.get_robot_model()
     robot_state = RobotState(robot_model)
     log_positions(robot_state, logger)
 
@@ -155,7 +161,7 @@ def main():
     arm.set_goal_state(robot_state=robot_state)
 
     # plan to goal - UNCOMMENT ME TO RUN!
-    #plan_and_execute(cobot, arm, logger)
+    #plan_and_execute(moveit, arm, logger)
 
     log_positions(robot_state, logger)
 
@@ -204,7 +210,7 @@ def main():
             pose_stamped_msg=pose_goal, pose_link="link6")
 
         # plan to goal
-        plan_and_execute(cobot, arm, logger)
+        plan_and_execute(moveit, arm, logger)
 
 
     ############################################################################
@@ -219,13 +225,13 @@ def main():
 
     ## initialise multi-pipeline plan request parameters
     #multi_pipeline_plan_request_params = MultiPipelinePlanRequestParameters(
-    #    #cobot, ["ompl_rrtc", "pilz_lin", "chomp_planner"]
-    #    cobot, ["chomp_planner"]
+    #    #moveit, ["ompl_rrtc", "pilz_lin", "chomp_planner"]
+    #    moveit, ["chomp_planner"]
     #    )
 
     ## plan to goal
     #plan_and_execute(
-    #    cobot,
+    #    moveit,
     #    arm,
     #    logger,
     #    multi_plan_parameters=multi_pipeline_plan_request_params,
