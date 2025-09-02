@@ -130,7 +130,7 @@ def main():
     arm.set_goal_state(motion_plan_constraints=[joint_constraint])
 
     # plan to goal
-    plan_and_execute(cobot, arm, logger, sleep_time=8.0)
+    plan_and_execute(cobot, arm, logger)
 
     log_positions(robot_state, logger)
 
@@ -171,7 +171,8 @@ def main():
 
     ypra = [ ]
     ypra.extend([ [0, 0, i*45] for i in range(1,8)])
-    ypra.extend([ [i*45, 0, 0] for i in range(1,8)])
+    #these tend to produce out-of-bounds, leave them out for the time being
+    #ypra.extend([ [i*45, 0, 0] for i in range(1,8)])
     ypra.extend([ [0, i*45, 0] for i in range(1,8)])
     ypra.append([0, 0, 0])
 
