@@ -18,6 +18,10 @@ from moveit.planning import (
     MultiPipelinePlanRequestParameters,
     )
 
+from geometry_msgs.msg import Pose
+from moveit_msgs.msg import CollisionObject
+from shape_msgs.msg import SolidPrimitive
+
 
 def euler_to_quaternion(yaw, pitch, roll):
     """
@@ -137,6 +141,54 @@ def main():
     ###########################################################################
     # Plan 5 - Spawn virtual object
     ###########################################################################
+
+    planning_scene = moveit.get_planning_scene_monitor()
+    logger.info(f"type of planning scene is: {type(planning_scene)}")
+
+    object_positions = [
+        (-0.15, 0.25, 0.0),
+        (-0.15, -0.25, 0.0),
+        #(0.25, 0.0, 1.0),
+        #(-0.25, -0.3, 0.8),
+        #(0.25, 0.3, 0.75),
+    ]
+    object_dimensions = [
+        (0.05, 0.05, 0.05),
+        (0.05, 0.05, 0.05),
+        #(0.1, 0.4, 0.1),
+        #(0.2, 0.2, 0.2),
+        #(0.15, 0.15, 0.15),
+    ]
+
+    with planning_scene.read_write() as scene:
+        logger.info(f"type of planning scene context is: {type(scene)}")
+
+        collision_object = CollisionObject()
+        collision_object.header.frame_id = "link_base"
+        collision_object.id = "boxes"
+
+        for position, dimensions in zip(object_positions, object_dimensions):
+            box_pose = Pose()
+            box_pose.position.x = position[0]
+            box_pose.position.y = position[1]
+            box_pose.position.z = position[2]
+
+            box = SolidPrimitive()
+            box.type = SolidPrimitive.BOX
+            box.dimensions = dimensions
+            collision_object.primitives.append(box)
+            collision_object.primitive_poses.append(box_pose)
+            collision_object.operation = CollisionObject.ADD
+
+        scene.apply_collision_object(collision_object)
+        scene.current_state.update()  # Important to ensure the scene is updated
+
+        logger.info("boxes added to the scene!")
+        time.sleep(0.20)
+        time.sleep(0.20)
+        time.sleep(0.20)
+        time.sleep(0.20)
+
 
 
 
