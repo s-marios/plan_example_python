@@ -3,24 +3,28 @@
 A script to outline the fundamentals of the moveit_py motion planning API.
 """
 
+# core python libraries
 import time
 import math
 import code
 
 # generic ros libraries
 import rclpy
+from rclpy.node import Node
 from rclpy.logging import get_logger
 
-# moveit python library
+# moveit related library
 from moveit.core.robot_state import RobotState
 from moveit.planning import (
     MoveItPy,
     MultiPipelinePlanRequestParameters,
     )
 
+# ros2 messages
 from geometry_msgs.msg import Pose
-from moveit_msgs.msg import CollisionObject
+from moveit_msgs.msg import CollisionObject, AttachedCollisionObject, PlanningScene
 from shape_msgs.msg import SolidPrimitive
+
 
 
 def euler_to_quaternion(yaw, pitch, roll):
@@ -84,12 +88,16 @@ def main():
     rclpy.init()
     logger = get_logger("moveit_py.pose_goal")
 
+    #rclpy.create_node(...)
+
     # instantiate MoveItPy instance and get planning component
     moveit = MoveItPy(node_name="moveit_py")
     arm = moveit.get_planning_component("lite6")
     logger.info("MoveItPy instance created")
-    time.sleep(5)
-    logger.info("Sleeping for 5 secs...")
+
+    ### Setup a second node and a publisher
+    node = rclpy.create_node("helper_node")
+    logger.info("created helper node!")
 
     ###########################################################################
     # Plan 1 - set states with predefined string
@@ -189,8 +197,39 @@ def main():
         time.sleep(0.20)
         time.sleep(0.20)
 
+    ############################################################################
+    ## Plan 6 - Add/Remove virtual objects, test raw moveit messages
+    ############################################################################
 
 
+    pspub = node.create_publisher(PlanningScene, "/planning_scene", 10)
+
+    collision_object = CollisionObject()
+    collision_object.header.frame_id = "link6" #relative to the eef
+    collision_object.id = "my_object"
+
+    primitive = SolidPrimitive()
+    primitive.type = SolidPrimitive.BOX
+    primitive.dimensions = [0.03, 0.03, 0.16]
+    collision_object.primitives.append(primitive)
+
+    object_pose = Pose()
+    object_pose.position.x = 0.0
+    object_pose.position.y = 0.0
+    object_pose.position.z = 0.08
+    collision_object.primitive_poses.append(object_pose)
+
+    attached_object = AttachedCollisionObject()
+    attached_object.object = collision_object
+    attached_object.link_name = "link6"
+    attached_object.object.operation = CollisionObject.ADD
+    attached_object.touch_links = ["link6"]
+
+    planning_scene = PlanningScene()
+    planning_scene.is_diff = True
+    planning_scene.robot_state.attached_collision_objects.append(attached_object)
+    pspub.publish(planning_scene)
+    rclpy.spin_once(node, timeout_sec=1.0)
 
     ############################################################################
     ## Plan 2 - set goal state with RobotState object
