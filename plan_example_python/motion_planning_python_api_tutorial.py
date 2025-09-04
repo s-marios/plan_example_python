@@ -26,7 +26,6 @@ from moveit_msgs.msg import CollisionObject, AttachedCollisionObject, PlanningSc
 from shape_msgs.msg import SolidPrimitive
 
 
-
 def euler_to_quaternion(yaw, pitch, roll):
     """
     Convert Euler angles (yaw, pitch, roll) to a quaternion.
@@ -82,7 +81,6 @@ def main():
     ###################################################################
     # MoveItPy Setup
     ###################################################################
-    # marios
     # just to make sure everything is set up before we start doing things
     time.sleep(5)
     rclpy.init()
@@ -156,16 +154,10 @@ def main():
     object_positions = [
         (-0.15, 0.25, 0.0),
         (-0.15, -0.25, 0.0),
-        #(0.25, 0.0, 1.0),
-        #(-0.25, -0.3, 0.8),
-        #(0.25, 0.3, 0.75),
     ]
     object_dimensions = [
         (0.05, 0.05, 0.05),
         (0.05, 0.05, 0.05),
-        #(0.1, 0.4, 0.1),
-        #(0.2, 0.2, 0.2),
-        #(0.15, 0.15, 0.15),
     ]
 
     with planning_scene.read_write() as scene:
@@ -189,7 +181,7 @@ def main():
             collision_object.operation = CollisionObject.ADD
 
         scene.apply_collision_object(collision_object)
-        scene.current_state.update()  # Important to ensure the scene is updated
+        scene.current_state.update()
 
         logger.info("boxes added to the scene!")
         time.sleep(0.20)
@@ -256,52 +248,108 @@ def main():
 
     log_positions(robot_state, logger)
 
-    ###########################################################################
-    # Plan 3 - set goal state with PoseStamped message
-    ###########################################################################
-    # TODO figure out the coordinate system
+#    ###########################################################################
+#    # Plan 3 - set goal state with PoseStamped message
+#    ###########################################################################
+#    # TODO figure out the coordinate system
+#
+#    # set plan start state to current state
+#
+#    # set pose goal with PoseStamped message
+#    from geometry_msgs.msg import PoseStamped
+#
+#    ypra = [ ]
+#    ypra.extend([ [0, 0, i*45] for i in range(1,8)])
+#    #these tend to produce out-of-bounds, leave them out for the time being
+#    #ypra.extend([ [i*45, 0, 0] for i in range(1,8)])
+#    ypra.extend([ [0, i*45, 0] for i in range(1,8)])
+#    ypra.append([0, 0, 0])
+#
+#    for target in ypra:
+#        arm.set_start_state_to_current_state()
+#        #yaw, pitch, roll angles
+#        quaternion = euler_to_quaternion(
+#                math.radians(target[0]),
+#                math.radians(target[1]),
+#                math.radians(target[2]))
+#        logger.info(f"target yaw pitch roll: {target}")
+#        logger.info(f"quaternion raw values: {quaternion}")
+#
+#        pose_goal = PoseStamped()
+#        pose_goal.header.frame_id = "link_base"
+#        pose_goal.pose.orientation.w = quaternion[0]
+#        pose_goal.pose.orientation.x = quaternion[1]
+#        pose_goal.pose.orientation.y = quaternion[2]
+#        pose_goal.pose.orientation.z = quaternion[3]
+#
+#        logger.info(f"pose type: {type(pose_goal.pose.orientation)}")
+#
+#        #these are METERS! don't push your luck
+#        pose_goal.pose.position.x = 0.0
+#        pose_goal.pose.position.y = 0.0
+#        pose_goal.pose.position.z = 0.5
+#        arm.set_goal_state(
+#            # that or joint6_flange maybe?
+#            pose_stamped_msg=pose_goal, pose_link="link6")
+#
+#        # plan to goal
+#        plan_and_execute(moveit, arm, logger)
 
-    # set plan start state to current state
+
+    ###########################################################################
+    # Plan 3.1 - set goal state with PoseStamped message
+    # points on a cube, effector orientaion pointing "outwards" from the
+    # (roughly) center of the cube
+    ###########################################################################
 
     # set pose goal with PoseStamped message
     from geometry_msgs.msg import PoseStamped
 
-    ypra = [ ]
-    ypra.extend([ [0, 0, i*45] for i in range(1,8)])
-    #these tend to produce out-of-bounds, leave them out for the time being
-    #ypra.extend([ [i*45, 0, 0] for i in range(1,8)])
-    ypra.extend([ [0, i*45, 0] for i in range(1,8)])
-    ypra.append([0, 0, 0])
+    angles = [
+        [225, 135, 0],
+        [315, 135, 0],
+        [45, 135, 0],
+        [135, 135, 0],
+        [135, 45, 0],
+        [45, 45, 0],
+        [315, 45, 0],
+        [225, 45, 0],
+            ]
 
-    for target in ypra:
+    quaternions = [euler_to_quaternion(
+        math.radians(angle[0]),
+        math.radians(angle[1]),
+        math.radians(angle[2])
+        ) for angle in angles]
+
+    cube = [
+        [-0.25, -0.25, 0.25],
+        [0.25, -0.25, 0.25],
+        [0.25, 0.25, 0.25],
+        [-0.25, 0.25, 0.25],
+        [-0.25, 0.25, 0.6],
+        [0.25, 0.25, 0.6],
+        [0.25, -0.25, 0.6],
+        [-0.25, -0.25, 0.6],
+            ]
+
+    # Move through all waypoints
+    for i, (p, q) in enumerate(zip(cube, quaternions), start=1):
         arm.set_start_state_to_current_state()
-        #yaw, pitch, roll angles
-        quaternion = euler_to_quaternion(
-                math.radians(target[0]),
-                math.radians(target[1]),
-                math.radians(target[2]))
-        logger.info(f"target yaw pitch roll: {target}")
-        logger.info(f"quaternion raw values: {quaternion}")
-
         pose_goal = PoseStamped()
         pose_goal.header.frame_id = "link_base"
-        pose_goal.pose.orientation.w = quaternion[0]
-        pose_goal.pose.orientation.x = quaternion[1]
-        pose_goal.pose.orientation.y = quaternion[2]
-        pose_goal.pose.orientation.z = quaternion[3]
+        pose_goal.pose.orientation.w = q[0]
+        pose_goal.pose.orientation.x = q[1]
+        pose_goal.pose.orientation.y = q[2]
+        pose_goal.pose.orientation.z = q[3]
 
-        logger.info(f"pose type: {type(pose_goal.pose.orientation)}")
+        pose_goal.pose.position.x = p[0]
+        pose_goal.pose.position.y = p[1]
+        pose_goal.pose.position.z = p[2]
 
-        #these are METERS! don't push your luck
-        pose_goal.pose.position.x = 0.0
-        pose_goal.pose.position.y = 0.0
-        pose_goal.pose.position.z = 0.5
-        arm.set_goal_state(
-            # that or joint6_flange maybe?
-            pose_stamped_msg=pose_goal, pose_link="link6")
-
-        # plan to goal
-        plan_and_execute(moveit, arm, logger)
+        logger.info(f"Moving to point {i}: x={p[0]}, y={p[1]}, z={p[2]}")
+        arm.set_goal_state(pose_stamped_msg=pose_goal, pose_link="link6")
+        plan_and_execute(moveit, arm, logger, sleep_time=0.5)
 
 
     ############################################################################
