@@ -148,8 +148,8 @@ def main():
     # Plan 5 - Spawn virtual object
     ###########################################################################
 
-    planning_scene = moveit.get_planning_scene_monitor()
-    logger.info(f"type of planning scene is: {type(planning_scene)}")
+    planning_scene_monitor = moveit.get_planning_scene_monitor()
+    logger.info(f"type of planning scene is: {type(planning_scene_monitor)}")
 
     object_positions = [
         (-0.15, 0.25, 0.0),
@@ -160,10 +160,15 @@ def main():
         (0.05, 0.05, 0.05),
     ]
 
-    with planning_scene.read_write() as scene:
-        logger.info(f"type of planning scene context is: {type(scene)}")
+    # a reference to the green boxes so we can delete them later
+    green_boxes = None
+
+    planning_scene_monitor = moveit.get_planning_scene_monitor()
+    with planning_scene_monitor.read_write() as scene:
 
         collision_object = CollisionObject()
+        green_boxes = collision_object
+
         collision_object.header.frame_id = "link_base"
         collision_object.id = "boxes"
 
@@ -178,19 +183,16 @@ def main():
             box.dimensions = dimensions
             collision_object.primitives.append(box)
             collision_object.primitive_poses.append(box_pose)
+            # the boxes appear even if the following line is commented out
             collision_object.operation = CollisionObject.ADD
 
         scene.apply_collision_object(collision_object)
         scene.current_state.update()
 
         logger.info("boxes added to the scene!")
-        time.sleep(0.20)
-        time.sleep(0.20)
-        time.sleep(0.20)
-        time.sleep(0.20)
 
     ############################################################################
-    ## Plan 6 - Add/Remove virtual objects, test raw moveit messages
+    ## Plan 6 - Add virtual objects, test raw moveit messages
     ############################################################################
 
 
@@ -222,6 +224,13 @@ def main():
     planning_scene.robot_state.attached_collision_objects.append(attached_object)
     pspub.publish(planning_scene)
     rclpy.spin_once(node, timeout_sec=1.0)
+
+    ##OR EQUIVALENTLY
+    #planning_scene_monitor = moveit.get_planning_scene_monitor()
+    #with planning_scene_monitor.read_write() as scene:
+    #    scene.process_attached_collision_object(attached_object)
+    #    scene.current_state.update()
+
 
     ############################################################################
     ## Plan 2 - set goal state with RobotState object
@@ -261,7 +270,7 @@ def main():
 #    ypra = [ ]
 #    ypra.extend([ [0, 0, i*45] for i in range(1,8)])
 #    #these tend to produce out-of-bounds, leave them out for the time being
-#    #ypra.extend([ [i*45, 0, 0] for i in range(1,8)])
+#    ypra.extend([ [i*45, 0, 0] for i in range(1,8)])
 #    ypra.extend([ [0, i*45, 0] for i in range(1,8)])
 #    ypra.append([0, 0, 0])
 #
@@ -351,6 +360,51 @@ def main():
         arm.set_goal_state(pose_stamped_msg=pose_goal, pose_link="link6")
         plan_and_execute(moveit, arm, logger, sleep_time=0.5)
 
+    ############################################################################
+    ## Plan 7 - Remove attached virtual object
+    ############################################################################
+    prev_scene = None
+    with planning_scene_monitor.read_only() as scene:
+        prev_scene = scene.planning_scene_message
+
+
+    # remove the lightsaber
+    planning_scene = PlanningScene()
+    planning_scene.is_diff = True
+    attached_object.object.operation = CollisionObject.REMOVE
+    ## detatch object
+    planning_scene.robot_state.attached_collision_objects.append(attached_object)
+    planning_scene.robot_state.is_diff = True
+    ## remove it from the world completely
+    # you can comment out the line below and see that the object is still in the world
+    planning_scene.world.collision_objects.append(attached_object.object)
+    pspub.publish(planning_scene)
+    rclpy.spin_once(node, timeout_sec=1.0)
+
+
+    time.sleep(10)
+    # houdini, make the lightsaber appear again!
+    pspub.publish(prev_scene)
+    rclpy.spin_once(node, timeout_sec=1.0)
+
+    time.sleep(3)
+
+    # remove the green boxes
+    planning_scene_monitor = moveit.get_planning_scene_monitor()
+    with planning_scene_monitor.read_write() as scene:
+        green_boxes.operation = CollisionObject.REMOVE
+        scene.apply_collision_object(green_boxes)
+        scene.current_state.update()
+
+        ## this did not the way I expected it to
+        ## not exactly sure that the attached object gets removed
+        #scene.process_attached_collision_object(attached_object)
+        #scene.current_state.update()
+
+    ## this didn't seem to work either..
+    #    robot_state.clear_attached_bodies()
+    #    robot_state.update()
+
 
     ############################################################################
     ## Plan 5 - Planning with Multiple Pipelines simultaneously
@@ -380,6 +434,10 @@ def main():
     #code.interact(local=locals())
 
     print("WE'RE DONE!")
+    time.sleep(20)
+    time.sleep(20)
+    time.sleep(20)
+    time.sleep(20)
     time.sleep(100)
 
 
