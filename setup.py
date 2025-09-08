@@ -26,7 +26,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'plan = plan_example_python.motion_planning_python_api_tutorial:main'
+            'plan = plan_example_python.motion_planning_python_api_tutorial:main',
+            'object_spawner = plan_example_python.object_spawner:main'
             ],
         },
     )
