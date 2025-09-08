@@ -27,7 +27,8 @@ setup(
     entry_points={
         'console_scripts': [
             'plan = plan_example_python.motion_planning_python_api_tutorial:main',
-            'object_spawner = plan_example_python.object_spawner:main'
+            'object_spawner = plan_example_python.object_spawner:main',
+            'pick_place = plan_example_python.pick_place:main'
             ],
         },
     )
