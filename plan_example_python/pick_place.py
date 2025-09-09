@@ -84,7 +84,7 @@ class PickAndPlace():
         for obj in extract_objects_from_scene_message(msg):
             self.object_queue.put(obj)
 
-    def move_to(self, obj_pose: Pose):
+    def move_to(self, obj_pose: Pose, height_compensate=False):
         self.logger.info(f"object coordinates: {
                                obj_pose.position.x,
                                obj_pose.position.y,
@@ -103,16 +103,79 @@ class PickAndPlace():
 
         pose_goal.pose.position.x = obj_pose.position.x
         pose_goal.pose.position.y = obj_pose.position.y
-        pose_goal.pose.position.z = obj_pose.position.z * 2.1
+        pose_goal.pose.position.z = obj_pose.position.z
+
+        if height_compensate == True:
+            pose_goal.pose.position.z = obj_pose.position.z * 2.1
+
 
         self.arm.set_goal_state(pose_stamped_msg=pose_goal, pose_link="link6")
         self.plan_and_execute()
 
-    def attach(self):
-        pass
+    def attach(self, obj: CollisionObject) -> AttachedCollisionObject:
+        self.logger.info(f"ATTACHING OBJECT ID: {obj.id}")
 
-    def detach(self):
-        pass
+        obj.header.frame_id = "link6" #relative to the eef
+
+        object_pose = Pose()
+        object_pose.position.x = 0.0
+        object_pose.position.y = 0.0
+        object_pose.position.z = 0.08
+
+        obj.pose = object_pose
+
+        attached_object = AttachedCollisionObject()
+        attached_object.object = obj
+        attached_object.link_name = "link6"
+        attached_object.object.operation = CollisionObject.ADD
+        attached_object.touch_links = ["link6"]
+
+        planning_scene = PlanningScene()
+        planning_scene.is_diff = True
+        planning_scene.robot_state.attached_collision_objects.append(attached_object)
+        self.publisher.publish(planning_scene)
+        return attached_object
+
+    def detach(self, attached_object: AttachedCollisionObject):
+        # remove the lightsaber
+        planning_scene = PlanningScene()
+        planning_scene.is_diff = True
+        attached_object.object.operation = CollisionObject.REMOVE
+
+        ## detatch object
+        planning_scene.robot_state.attached_collision_objects.append(attached_object)
+        planning_scene.robot_state.is_diff = True
+        ## remove it from the world completely
+        # you can comment out the line below and see that the object is still in the world
+        planning_scene.world.collision_objects.append(attached_object.object)
+        self.publisher.publish(planning_scene)
+
+    def main_loop(self):
+
+        #hard-coded drop location
+        drop_location = Pose()
+        #x, y hard-coded
+        drop_location.position.x = -0.2
+        drop_location.position.y = 0.2
+        #z changes depending on object height
+
+        while True:
+            #step 1: detect new object (WIP)
+            self.logger.info(f"we got a message from the queue!!!!")
+            obj = self.object_queue.get()
+
+            #step 2: move to object
+            self.move_to(obj.pose, True)
+
+            #step 3: pickup/attach object
+            attached_object = self.attach(obj)
+
+            #step 4: move to drop location
+            drop_location.position.z = obj.primitives[0].dimensions[SolidPrimitive.BOX_Z] + 0.01
+            self.move_to(drop_location)
+
+            #step 5: detach
+            self.detach(attached_object)
 
     def plan_and_execute(
             self,
@@ -164,166 +227,8 @@ def main():
     #############################################################################
     pick_place = PickAndPlace()
     pick_place.start_spinning()
+    pick_place.main_loop()
 
-    while True:
-        #step 1: detect new object (WIP)
-        pick_place.logger.info(f"we got a message from the queue!!!!")
-        obj = pick_place.object_queue.get()
-
-        #step 2: move to object
-        pick_place.move_to(obj.pose)
-
-        #step 3: pickup/attach object
-
-        #step 4: move to drop location
-
-        #step 5: detach
-
-    #for i in range(0, 10):
-    #    pick_place.logger.info(f"THIS IS THE MAIN THREAD!!!! {i}")
-    #    time.sleep(10)
-
-
-    #pspub = node.create_publisher(PlanningScene, "/planning_scene", 10)
-
-    #collision_object = CollisionObject()
-    #collision_object.header.frame_id = "link6" #relative to the eef
-    #collision_object.id = "my_object"
-
-    #primitive = SolidPrimitive()
-    #primitive.type = SolidPrimitive.BOX
-    #primitive.dimensions = [0.03, 0.03, 0.16]
-    #collision_object.primitives.append(primitive)
-
-    #object_pose = Pose()
-    #object_pose.position.x = 0.0
-    #object_pose.position.y = 0.0
-    #object_pose.position.z = 0.08
-    #collision_object.primitive_poses.append(object_pose)
-
-    #attached_object = AttachedCollisionObject()
-    #attached_object.object = collision_object
-    #attached_object.link_name = "link6"
-    #attached_object.object.operation = CollisionObject.ADD
-    #attached_object.touch_links = ["link6"]
-
-    #planning_scene = PlanningScene()
-    #planning_scene.is_diff = True
-    #planning_scene.robot_state.attached_collision_objects.append(attached_object)
-    #pspub.publish(planning_scene)
-    #rclpy.spin_once(node, timeout_sec=1.0)
-
-    ###OR EQUIVALENTLY
-    ##planning_scene_monitor = moveit.get_planning_scene_monitor()
-    ##with planning_scene_monitor.read_write() as scene:
-    ##    scene.process_attached_collision_object(attached_object)
-    ##    scene.current_state.update()
-
-
-
-    ############################################################################
-    ## Plan 3.1 - set goal state with PoseStamped message
-    ## points on a cube, effector orientaion pointing "outwards" from the
-    ## (roughly) center of the cube
-    ############################################################################
-
-    ## set pose goal with PoseStamped message
-    #from geometry_msgs.msg import PoseStamped
-
-    #angles = [
-    #    [225, 135, 0],
-    #    [315, 135, 0],
-    #    #[45, 135, 0],
-    #    #[135, 135, 0],
-    #    #[135, 45, 0],
-    #    #[45, 45, 0],
-    #    #[315, 45, 0],
-    #    #[225, 45, 0],
-    #        ]
-
-    #quaternions = [euler_to_quaternion(
-    #    math.radians(angle[0]),
-    #    math.radians(angle[1]),
-    #    math.radians(angle[2])
-    #    ) for angle in angles]
-
-    #cube = [
-    #    [-0.25, -0.25, 0.25],
-    #    [0.25, -0.25, 0.25],
-    #    #[0.25, 0.25, 0.25],
-    #    #[-0.25, 0.25, 0.25],
-    #    #[-0.25, 0.25, 0.6],
-    #    #[0.25, 0.25, 0.6],
-    #    #[0.25, -0.25, 0.6],
-    #    #[-0.25, -0.25, 0.6],
-    #        ]
-
-    ## Move through all waypoints
-    #for i, (p, q) in enumerate(zip(cube, quaternions), start=1):
-    #    arm.set_start_state_to_current_state()
-    #    pose_goal = PoseStamped()
-    #    pose_goal.header.frame_id = "link_base"
-    #    pose_goal.pose.orientation.w = q[0]
-    #    pose_goal.pose.orientation.x = q[1]
-    #    pose_goal.pose.orientation.y = q[2]
-    #    pose_goal.pose.orientation.z = q[3]
-
-    #    pose_goal.pose.position.x = p[0]
-    #    pose_goal.pose.position.y = p[1]
-    #    pose_goal.pose.position.z = p[2]
-
-    #    logger.info(f"Moving to point {i}: x={p[0]}, y={p[1]}, z={p[2]}")
-    #    arm.set_goal_state(pose_stamped_msg=pose_goal, pose_link="link6")
-    #    plan_and_execute(moveit, arm, logger, sleep_time=0.5)
-
-    #############################################################################
-    ### Plan 7 - Remove attached virtual object
-    #############################################################################
-    #prev_scene = None
-    #with planning_scene_monitor.read_only() as scene:
-    #    prev_scene = scene.planning_scene_message
-
-
-    ## remove the lightsaber
-    #planning_scene = PlanningScene()
-    #planning_scene.is_diff = True
-    #attached_object.object.operation = CollisionObject.REMOVE
-    ### detatch object
-    #planning_scene.robot_state.attached_collision_objects.append(attached_object)
-    #planning_scene.robot_state.is_diff = True
-    ### remove it from the world completely
-    ## you can comment out the line below and see that the object is still in the world
-    #planning_scene.world.collision_objects.append(attached_object.object)
-    #pspub.publish(planning_scene)
-    #rclpy.spin_once(node, timeout_sec=1.0)
-
-
-    #time.sleep(10)
-    ## houdini, make the lightsaber appear again!
-    #pspub.publish(prev_scene)
-    #rclpy.spin_once(node, timeout_sec=1.0)
-
-    #time.sleep(3)
-
-    ## remove the green boxes
-    #planning_scene_monitor = moveit.get_planning_scene_monitor()
-    #with planning_scene_monitor.read_write() as scene:
-    #    green_boxes.operation = CollisionObject.REMOVE
-    #    scene.apply_collision_object(green_boxes)
-    #    scene.current_state.update()
-
-    #    ## this did not the way I expected it to
-    #    ## not exactly sure that the attached object gets removed
-    #    #scene.process_attached_collision_object(attached_object)
-    #    #scene.current_state.update()
-
-    ## this didn't seem to work either..
-    #    robot_state.clear_attached_bodies()
-    #    robot_state.update()
-
-
-    print("WE'RE DONE!")
-    time.sleep(20)
 
 
 if __name__ == "__main__":
