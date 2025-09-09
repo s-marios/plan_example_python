@@ -54,7 +54,8 @@ class Spawner:
         object_pose.position.x = position[0]
         object_pose.position.y = position[1]
         object_pose.position.z = position[2]
-        collision_object.primitive_poses.append(object_pose)
+        #collision_object.primitive_poses.append(object_pose)
+        collision_object.pose = object_pose
         collision_object.operation = CollisionObject.ADD
         return collision_object
 
@@ -85,10 +86,10 @@ def main():
     time.sleep(5)
 
     for i in range(0, 10):
-        pos = [-0.3 + (0.6 * i / 10.0 ), -0.2,  0.08]
-        pickup_object = spawner.create_object(object_id=f"obj{i}", position=pos)
+        pos = [0.2, -0.2 + (0.4 * i / 10.0 ),  0.08]
+        pickup_object = spawner.create_object(object_id=f"pick_{i}", position=pos)
         spawner.publish_object(pickup_object)
-        time.sleep(1)
+        time.sleep(5)
 
     print("WE'RE DONE!")
     spawner.destroy()

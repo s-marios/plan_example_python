@@ -23,7 +23,7 @@ from moveit.planning import (
     )
 
 # ros2 messages
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Pose, PoseStamped
 from moveit_msgs.msg import CollisionObject, AttachedCollisionObject, PlanningScene
 from shape_msgs.msg import SolidPrimitive
 
@@ -113,7 +113,8 @@ class PickAndPlace():
 
     def scene_changed_callback(self, msg: PlanningScene):
         self.logger.info("scene changed!")
-        self.object_queue.put(msg)
+        for obj in extract_objects_from_scene_message(msg):
+            self.object_queue.put(obj)
 
     def move_to(self):
         pass
@@ -123,6 +124,18 @@ class PickAndPlace():
 
     def detach(self):
         pass
+
+def extract_objects_from_scene_message(scene: PlanningScene) -> list[CollisionObject]:
+    result = []
+    if scene.is_diff != True:
+        return result
+
+
+    for obj in scene.world.collision_objects:
+        if obj.id.startswith("pick") and obj.operation == CollisionObject.ADD:
+            result.append(obj)
+
+    return result
 
 def main():
 
@@ -134,11 +147,35 @@ def main():
 
     while True:
         #step 1: detect new object (WIP)
-        msg = pick_place.object_queue.get()
         pick_place.logger.info(f"we got a message from the queue!!!!")
+        obj = pick_place.object_queue.get()
 
         #step 2: move to object
-        #TODO
+        pick_place.logger.info(f"object coordinates: {
+                               obj.pose.position.x,
+                               obj.pose.position.y,
+                               obj.pose.position.z}")
+
+
+        pick_place.arm.set_start_state_to_current_state()
+        pose_goal = PoseStamped()
+        pose_goal.header.frame_id = "world"
+
+        q = euler_to_quaternion(math.radians(0), math.radians(180), math.radians(0))
+
+        pose_goal.pose.orientation.w = q[0]
+        pose_goal.pose.orientation.x = q[1]
+        pose_goal.pose.orientation.y = q[2]
+        pose_goal.pose.orientation.z = q[3]
+
+
+        pose_goal.pose.position.x = obj.pose.position.x
+        pose_goal.pose.position.y = obj.pose.position.y
+        pose_goal.pose.position.z = obj.pose.position.z * 2.1
+
+        #pick_place.logger.info(f"Moving to point: x={p[0]}, y={p[1]}, z={p[2]}")
+        pick_place.arm.set_goal_state(pose_stamped_msg=pose_goal, pose_link="link6")
+        plan_and_execute(pick_place.moveit, pick_place.arm, pick_place.logger, sleep_time=0.5)
 
         #step 3: pickup/attach object
 
