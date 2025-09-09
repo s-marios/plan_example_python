@@ -41,38 +41,6 @@ def euler_to_quaternion(yaw, pitch, roll):
 
     return [qw, qx, qy, qz]
 
-def plan_and_execute(
-        robot,
-        planning_component,
-        logger,
-        single_plan_parameters=None,
-        multi_plan_parameters=None,
-        sleep_time=0.0,
-        ):
-    """Helper function to plan and execute a motion."""
-    # plan to goal
-    logger.info("Planning trajectory")
-    if multi_plan_parameters is not None:
-        plan_result = planning_component.plan(
-            multi_plan_parameters=multi_plan_parameters
-            )
-    elif single_plan_parameters is not None:
-        plan_result = planning_component.plan(
-            single_plan_parameters=single_plan_parameters
-            )
-    else:
-        plan_result = planning_component.plan()
-
-    # execute the plan
-    if plan_result:
-        logger.info("Executing plan")
-        robot_trajectory = plan_result.trajectory
-        robot.execute(robot_trajectory, controllers=[])
-        logger.info("Execute finished!")
-    else:
-        logger.error("Planning failed")
-
-    time.sleep(sleep_time)
 
 def log_positions(robot_state, logger):
     positions = robot_state.get_joint_group_positions("lite6")
@@ -116,14 +84,66 @@ class PickAndPlace():
         for obj in extract_objects_from_scene_message(msg):
             self.object_queue.put(obj)
 
-    def move_to(self):
-        pass
+    def move_to(self, obj_pose: Pose):
+        self.logger.info(f"object coordinates: {
+                               obj_pose.position.x,
+                               obj_pose.position.y,
+                               obj_pose.position.z}")
+
+        self.arm.set_start_state_to_current_state()
+        pose_goal = PoseStamped()
+        pose_goal.header.frame_id = "world"
+
+        q = euler_to_quaternion(math.radians(0), math.radians(180), math.radians(0))
+
+        pose_goal.pose.orientation.w = q[0]
+        pose_goal.pose.orientation.x = q[1]
+        pose_goal.pose.orientation.y = q[2]
+        pose_goal.pose.orientation.z = q[3]
+
+        pose_goal.pose.position.x = obj_pose.position.x
+        pose_goal.pose.position.y = obj_pose.position.y
+        pose_goal.pose.position.z = obj_pose.position.z * 2.1
+
+        self.arm.set_goal_state(pose_stamped_msg=pose_goal, pose_link="link6")
+        self.plan_and_execute()
 
     def attach(self):
         pass
 
     def detach(self):
         pass
+
+    def plan_and_execute(
+            self,
+            single_plan_parameters=None,
+            multi_plan_parameters=None,
+            sleep_time=0.0,
+            ):
+        """Helper function to plan and execute a motion."""
+        # plan to goal
+        self.logger.info("Planning trajectory")
+        if multi_plan_parameters is not None:
+            plan_result = self.arm.plan(
+                multi_plan_parameters=multi_plan_parameters
+                )
+        elif single_plan_parameters is not None:
+            plan_result = self.arm.plan(
+                single_plan_parameters=single_plan_parameters
+                )
+        else:
+            plan_result = self.arm.plan()
+
+        # execute the plan
+        if plan_result:
+            self.logger.info("Executing plan")
+            robot_trajectory = plan_result.trajectory
+            self.moveit.execute(robot_trajectory, controllers=[])
+            self.logger.info("Execute finished!")
+        else:
+            self.logger.error("Planning failed")
+
+        time.sleep(sleep_time)
 
 def extract_objects_from_scene_message(scene: PlanningScene) -> list[CollisionObject]:
     result = []
@@ -151,31 +171,7 @@ def main():
         obj = pick_place.object_queue.get()
 
         #step 2: move to object
-        pick_place.logger.info(f"object coordinates: {
-                               obj.pose.position.x,
-                               obj.pose.position.y,
-                               obj.pose.position.z}")
-
-
-        pick_place.arm.set_start_state_to_current_state()
-        pose_goal = PoseStamped()
-        pose_goal.header.frame_id = "world"
-
-        q = euler_to_quaternion(math.radians(0), math.radians(180), math.radians(0))
-
-        pose_goal.pose.orientation.w = q[0]
-        pose_goal.pose.orientation.x = q[1]
-        pose_goal.pose.orientation.y = q[2]
-        pose_goal.pose.orientation.z = q[3]
-
-
-        pose_goal.pose.position.x = obj.pose.position.x
-        pose_goal.pose.position.y = obj.pose.position.y
-        pose_goal.pose.position.z = obj.pose.position.z * 2.1
-
-        #pick_place.logger.info(f"Moving to point: x={p[0]}, y={p[1]}, z={p[2]}")
-        pick_place.arm.set_goal_state(pose_stamped_msg=pose_goal, pose_link="link6")
-        plan_and_execute(pick_place.moveit, pick_place.arm, pick_place.logger, sleep_time=0.5)
+        pick_place.move_to(obj.pose)
 
         #step 3: pickup/attach object
 
