@@ -106,7 +106,7 @@ class PickAndPlace():
         pose_goal.pose.position.z = obj_pose.position.z
 
         if height_compensate == True:
-            pose_goal.pose.position.z = obj_pose.position.z * 2.1
+            pose_goal.pose.position.z = obj_pose.position.z * 2.
 
 
         self.arm.set_goal_state(pose_stamped_msg=pose_goal, pose_link="link6")
@@ -120,7 +120,9 @@ class PickAndPlace():
         object_pose = Pose()
         object_pose.position.x = 0.0
         object_pose.position.y = 0.0
-        object_pose.position.z = 0.08
+        #TODO this is bad, because we only deal with boxes
+        #change this to deal with other primitives such as cylinders
+        object_pose.position.z = obj.primitives[0].dimensions[2] / 2.0
 
         obj.pose = object_pose
 
