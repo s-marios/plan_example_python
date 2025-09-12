@@ -19,7 +19,7 @@ from rclpy.logging import get_logger
 
 # ros2 messages
 from geometry_msgs.msg import Pose
-from moveit_msgs.msg import CollisionObject, AttachedCollisionObject, PlanningScene
+from moveit_msgs.msg import CollisionObject, AttachedCollisionObject, PlanningScene, ObjectColor
 from shape_msgs.msg import SolidPrimitive
 
 
@@ -71,10 +71,13 @@ class Spawner:
         collision_object.operation = CollisionObject.ADD
         return collision_object
 
-    def publish_object(self, obj: CollisionObject):
+    def publish_object(self, obj: CollisionObject, color: ObjectColor = None):
         planning_scene = PlanningScene()
         planning_scene.is_diff = True
         planning_scene.world.collision_objects.append(obj)
+
+        if color:
+            planning_scene.object_colors.append(color)
 
         self.publisher.publish(planning_scene)
         rclpy.spin_once(self.node, timeout_sec=1.0)
@@ -111,6 +114,24 @@ class Spawner:
     def start_spinning(self):
         rclpy.spin(self.node)
 
+    def setup_obstacles(self):
+        obtl_id = "tall_box"
+        dimensions = [0.05, 0.05, 0.4]
+        position = [-0.03, 0.25, dimensions[2]/2.0]
+
+        obj = self.create_object(obtl_id, dimensions, position)
+
+        color = ObjectColor()
+        color.id = "tall_box"
+        color.color.r = 1.0
+        color.color.g = 0.0
+        color.color.b = 0.0
+        color.color.a = 1.0
+
+        self.publish_object(obj, color)
+        self.logger.info(f"Spawned Obstacle: {obtl_id}")
+
+
 
 def main():
 
@@ -125,7 +146,7 @@ def main():
     ############################################################################
     time.sleep(10)
 
-    #spawner.setup_obstacles()
+    spawner.setup_obstacles()
 
     # spawn one initial object to get us going
     spawner.spawn_random_object()
