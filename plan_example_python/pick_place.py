@@ -5,6 +5,7 @@ A script to outline the fundamentals of the moveit_py motion planning API.
 
 # core python libraries
 import time
+import copy
 import math
 import code
 import threading
@@ -84,7 +85,7 @@ class PickAndPlace():
         for obj in extract_objects_from_scene_message(msg):
             self.object_queue.put(obj)
 
-    def move_to(self, obj_pose: Pose, height_compensate=False):
+    def move_to(self, obj_pose: Pose):
         self.logger.info(f"object coordinates: {
                                obj_pose.position.x,
                                obj_pose.position.y,
@@ -104,10 +105,6 @@ class PickAndPlace():
         pose_goal.pose.position.x = obj_pose.position.x
         pose_goal.pose.position.y = obj_pose.position.y
         pose_goal.pose.position.z = obj_pose.position.z
-
-        if height_compensate == True:
-            pose_goal.pose.position.z = obj_pose.position.z * 2.
-
 
         self.arm.set_goal_state(pose_stamped_msg=pose_goal, pose_link="link6")
         self.plan_and_execute()
@@ -166,8 +163,10 @@ class PickAndPlace():
             self.logger.info(f"we got a message from the queue!!!!")
             obj = self.object_queue.get()
 
-            #step 2: move to object
-            self.move_to(obj.pose, True)
+            #step 2: move to object (TODO Implicit assumption that all objects are boxes..)
+            pick_location = copy.copy(obj.pose)
+            pick_location.position.z += obj.primitives[0].dimensions[SolidPrimitive.BOX_Z]/2.
+            self.move_to(pick_location)
 
             #step 3: pickup/attach object
             attached_object = self.attach(obj)

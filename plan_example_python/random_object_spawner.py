@@ -96,17 +96,18 @@ class Spawner:
 
     def spawn_random_object(self):
         self.i = self.i + 1
-        x = random.uniform(0.15, 0.30)
-        y = random.uniform(-0.25,0.25)
-        z = 0.08
 
         dimensions = [random.uniform(0.05, 0.1) for i in range(0,3)]
-        pos = [x,y,dimensions[2]/2.]
+        position = [
+                random.uniform(0.15, 0.30),
+                random.uniform(-0.25,0.25),
+                dimensions[2]/2.
+                ]
 
         pick_object = self.create_object(
                 object_id = f"pick_{self.i}",
-                position = pos,
-                dimensions = dimensions,
+                dimensions,
+                position,
         )
 
         self.publish_object(pick_object)
