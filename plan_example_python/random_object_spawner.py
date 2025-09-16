@@ -106,8 +106,8 @@ class Spawner:
 
         pick_object = self.create_object(
                 object_id = f"pick_{self.i}",
-                dimensions,
-                position,
+                dimensions = dimensions,
+                position = position,
         )
 
         self.publish_object(pick_object)
