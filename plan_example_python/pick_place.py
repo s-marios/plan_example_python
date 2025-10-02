@@ -132,6 +132,7 @@ class PickAndPlace():
         planning_scene = PlanningScene()
         planning_scene.is_diff = True
         planning_scene.robot_state.attached_collision_objects.append(attached_object)
+        planning_scene.robot_state.is_diff = True
         self.publisher.publish(planning_scene)
         return attached_object
 
