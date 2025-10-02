@@ -97,8 +97,9 @@ def main():
     node = rclpy.create_node("helper_node")
     logger.info("created helper node!")
 
+
     ###########################################################################
-    # Plan 1 - set states with predefined string
+    # Plan 1 - Move to a predefined state
     ###########################################################################
 
     # set plan start state using predefined state
@@ -110,8 +111,35 @@ def main():
     # plan to goal
     plan_and_execute(moveit, arm, logger, sleep_time=1.0)
 
+
+    ############################################################################
+    ## Plan 2 - Move to a random state
+    ############################################################################
+
+    ## instantiate a RobotState instance using the current robot model
+    robot_model = moveit.get_robot_model()
+    robot_state = RobotState(robot_model)
+    log_positions(robot_state, logger)
+
+
+    # randomize the robot state
+    robot_state.set_to_random_positions()
+
+    # set plan start state to current state
+    arm.set_start_state_to_current_state()
+
+    # set goal state to the initialized robot state
+    logger.info("Set goal state to the initialized robot state")
+    arm.set_goal_state(robot_state=robot_state)
+
+    # comment out the next line if you want to skip it
+    plan_and_execute(moveit, arm, logger)
+
+    log_positions(robot_state, logger)
+
+
     ###########################################################################
-    # Plan 4 - set goal state with constraints
+    # Plan 3 - Set goal state using constraints
     ###########################################################################
 
     # set plan start state to current state
@@ -145,168 +173,7 @@ def main():
     log_positions(robot_state, logger)
 
     ###########################################################################
-    # Plan 5 - Spawn virtual object
-    ###########################################################################
-
-    planning_scene_monitor = moveit.get_planning_scene_monitor()
-    logger.info(f"type of planning scene is: {type(planning_scene_monitor)}")
-
-    object_positions = [
-        (-0.15, 0.25, 0.0),
-        (-0.15, -0.25, 0.0),
-    ]
-    object_dimensions = [
-        (0.05, 0.05, 0.05),
-        (0.05, 0.05, 0.05),
-    ]
-
-    # a reference to the green boxes so we can delete them later
-    green_boxes = None
-
-    planning_scene_monitor = moveit.get_planning_scene_monitor()
-    with planning_scene_monitor.read_write() as scene:
-
-        collision_object = CollisionObject()
-        green_boxes = collision_object
-
-        collision_object.header.frame_id = "link_base"
-        collision_object.id = "boxes"
-
-        for position, dimensions in zip(object_positions, object_dimensions):
-            box_pose = Pose()
-            box_pose.position.x = position[0]
-            box_pose.position.y = position[1]
-            box_pose.position.z = position[2]
-
-            box = SolidPrimitive()
-            box.type = SolidPrimitive.BOX
-            box.dimensions = dimensions
-            collision_object.primitives.append(box)
-            collision_object.primitive_poses.append(box_pose)
-            # the boxes appear even if the following line is commented out
-            collision_object.operation = CollisionObject.ADD
-
-        scene.apply_collision_object(collision_object)
-        scene.current_state.update()
-
-        logger.info("boxes added to the scene!")
-
-    ############################################################################
-    ## Plan 6 - Add virtual objects, test raw moveit messages
-    ############################################################################
-
-
-    pspub = node.create_publisher(PlanningScene, "/planning_scene", 10)
-
-    collision_object = CollisionObject()
-    collision_object.header.frame_id = "link6" #relative to the eef
-    collision_object.id = "my_object"
-
-    primitive = SolidPrimitive()
-    primitive.type = SolidPrimitive.BOX
-    primitive.dimensions = [0.03, 0.03, 0.16]
-    collision_object.primitives.append(primitive)
-
-    object_pose = Pose()
-    object_pose.position.x = 0.0
-    object_pose.position.y = 0.0
-    object_pose.position.z = 0.08
-    collision_object.primitive_poses.append(object_pose)
-
-    attached_object = AttachedCollisionObject()
-    attached_object.object = collision_object
-    attached_object.link_name = "link6"
-    attached_object.object.operation = CollisionObject.ADD
-    attached_object.touch_links = ["link6"]
-
-    planning_scene = PlanningScene()
-    planning_scene.is_diff = True
-    planning_scene.robot_state.attached_collision_objects.append(attached_object)
-    pspub.publish(planning_scene)
-    rclpy.spin_once(node, timeout_sec=1.0)
-
-    ##OR EQUIVALENTLY
-    #planning_scene_monitor = moveit.get_planning_scene_monitor()
-    #with planning_scene_monitor.read_write() as scene:
-    #    scene.process_attached_collision_object(attached_object)
-    #    scene.current_state.update()
-
-
-    ############################################################################
-    ## Plan 2 - set goal state with RobotState object
-    ############################################################################
-
-    ## instantiate a RobotState instance using the current robot model
-    robot_model = moveit.get_robot_model()
-    robot_state = RobotState(robot_model)
-    log_positions(robot_state, logger)
-
-
-    # randomize the robot state
-    robot_state.set_to_random_positions()
-
-    # set plan start state to current state
-    arm.set_start_state_to_current_state()
-
-    # set goal state to the initialized robot state
-    logger.info("Set goal state to the initialized robot state")
-    arm.set_goal_state(robot_state=robot_state)
-
-    # plan to goal - UNCOMMENT ME TO RUN!
-    #plan_and_execute(moveit, arm, logger)
-
-    log_positions(robot_state, logger)
-
-#    ###########################################################################
-#    # Plan 3 - set goal state with PoseStamped message
-#    ###########################################################################
-#    # TODO figure out the coordinate system
-#
-#    # set plan start state to current state
-#
-#    # set pose goal with PoseStamped message
-#    from geometry_msgs.msg import PoseStamped
-#
-#    ypra = [ ]
-#    ypra.extend([ [0, 0, i*45] for i in range(1,8)])
-#    #these tend to produce out-of-bounds, leave them out for the time being
-#    ypra.extend([ [i*45, 0, 0] for i in range(1,8)])
-#    ypra.extend([ [0, i*45, 0] for i in range(1,8)])
-#    ypra.append([0, 0, 0])
-#
-#    for target in ypra:
-#        arm.set_start_state_to_current_state()
-#        #yaw, pitch, roll angles
-#        quaternion = euler_to_quaternion(
-#                math.radians(target[0]),
-#                math.radians(target[1]),
-#                math.radians(target[2]))
-#        logger.info(f"target yaw pitch roll: {target}")
-#        logger.info(f"quaternion raw values: {quaternion}")
-#
-#        pose_goal = PoseStamped()
-#        pose_goal.header.frame_id = "link_base"
-#        pose_goal.pose.orientation.w = quaternion[0]
-#        pose_goal.pose.orientation.x = quaternion[1]
-#        pose_goal.pose.orientation.y = quaternion[2]
-#        pose_goal.pose.orientation.z = quaternion[3]
-#
-#        logger.info(f"pose type: {type(pose_goal.pose.orientation)}")
-#
-#        #these are METERS! don't push your luck
-#        pose_goal.pose.position.x = 0.0
-#        pose_goal.pose.position.y = 0.0
-#        pose_goal.pose.position.z = 0.5
-#        arm.set_goal_state(
-#            # that or joint6_flange maybe?
-#            pose_stamped_msg=pose_goal, pose_link="link6")
-#
-#        # plan to goal
-#        plan_and_execute(moveit, arm, logger)
-
-
-    ###########################################################################
-    # Plan 3.1 - set goal state with PoseStamped message
+    # Plan 4 - Move to specific coordinate
     # points on a cube, effector orientaion pointing "outwards" from the
     # (roughly) center of the cube
     ###########################################################################
@@ -360,13 +227,108 @@ def main():
         arm.set_goal_state(pose_stamped_msg=pose_goal, pose_link="link6")
         plan_and_execute(moveit, arm, logger, sleep_time=0.5)
 
+
+    ###########################################################################
+    # Plan 5 - Spawn virtual objects Using MoveIt!
+    ###########################################################################
+
+    planning_scene_monitor = moveit.get_planning_scene_monitor()
+    logger.info(f"type of planning scene is: {type(planning_scene_monitor)}")
+
+    object_positions = [
+        (-0.15, 0.25, 0.0),
+        (-0.15, -0.25, 0.0),
+    ]
+    object_dimensions = [
+        (0.05, 0.05, 0.05),
+        (0.05, 0.05, 0.05),
+    ]
+
+    # a reference to the green boxes so we can delete them later
+    green_boxes = None
+
+    planning_scene_monitor = moveit.get_planning_scene_monitor()
+    with planning_scene_monitor.read_write() as scene:
+
+        collision_object = CollisionObject()
+        green_boxes = collision_object
+
+        collision_object.header.frame_id = "link_base"
+        collision_object.id = "boxes"
+
+        for position, dimensions in zip(object_positions, object_dimensions):
+            box_pose = Pose()
+            box_pose.position.x = position[0]
+            box_pose.position.y = position[1]
+            box_pose.position.z = position[2]
+
+            box = SolidPrimitive()
+            box.type = SolidPrimitive.BOX
+            box.dimensions = dimensions
+            collision_object.primitives.append(box)
+            collision_object.primitive_poses.append(box_pose)
+            # the boxes appear even if the following line is commented out
+            collision_object.operation = CollisionObject.ADD
+
+        scene.apply_collision_object(collision_object)
+        scene.current_state.update()
+
+        logger.info("boxes added to the scene!")
+    time.sleep(10)
+
+    ############################################################################
+    ## Plan 6 - Spawn virtual objects using raw messages
+    ############################################################################
+
+
+    pspub = node.create_publisher(PlanningScene, "/planning_scene", 10)
+
+    collision_object = CollisionObject()
+    collision_object.header.frame_id = "link6" #relative to the eef
+    collision_object.id = "lightsaber"
+
+    primitive = SolidPrimitive()
+    primitive.type = SolidPrimitive.BOX
+    primitive.dimensions = [0.03, 0.03, 0.16]
+    collision_object.primitives.append(primitive)
+
+    object_pose = Pose()
+    object_pose.position.x = 0.0
+    object_pose.position.y = 0.0
+    object_pose.position.z = 0.08
+    collision_object.primitive_poses.append(object_pose)
+
+    attached_object = AttachedCollisionObject()
+    attached_object.object = collision_object
+    attached_object.link_name = "link6"
+    attached_object.object.operation = CollisionObject.ADD
+    attached_object.touch_links = ["link6"]
+
+    planning_scene = PlanningScene()
+    planning_scene.is_diff = True
+    planning_scene.robot_state.attached_collision_objects.append(attached_object)
+    planning_scene.robot_state.is_diff = True
+
+    pspub.publish(planning_scene)
+    rclpy.spin_once(node, timeout_sec=1.0)
+
+    time.sleep(10)
+
+    ##OR EQUIVALENTLY WITH MOVEIT
+    #planning_scene_monitor = moveit.get_planning_scene_monitor()
+    #with planning_scene_monitor.read_write() as scene:
+    #    scene.process_attached_collision_object(attached_object)
+    #    scene.current_state.update()
+
+
     ############################################################################
     ## Plan 7 - Remove attached virtual object
     ############################################################################
+
+    # grab a copy of the current scene to recall it later
     prev_scene = None
     with planning_scene_monitor.read_only() as scene:
         prev_scene = scene.planning_scene_message
-
 
     # remove the lightsaber
     planning_scene = PlanningScene()
@@ -381,8 +343,8 @@ def main():
     pspub.publish(planning_scene)
     rclpy.spin_once(node, timeout_sec=1.0)
 
-
     time.sleep(10)
+
     # houdini, make the lightsaber appear again!
     pspub.publish(prev_scene)
     rclpy.spin_once(node, timeout_sec=1.0)
@@ -406,8 +368,60 @@ def main():
     #    robot_state.update()
 
 
+
+#    ###########################################################################
+#    # Plan X - set goal state with PoseStamped message
+#    # Use this when you want to induce positioning errors, testing accuracy
+#    ###########################################################################
+#    # TODO figure out the coordinate system
+#
+#    # set plan start state to current state
+#
+#    # set pose goal with PoseStamped message
+#    from geometry_msgs.msg import PoseStamped
+#
+#    ypra = [ ]
+#    ypra.extend([ [0, 0, i*45] for i in range(1,8)])
+#    #these tend to produce out-of-bounds, leave them out for the time being
+#    ypra.extend([ [i*45, 0, 0] for i in range(1,8)])
+#    ypra.extend([ [0, i*45, 0] for i in range(1,8)])
+#    ypra.append([0, 0, 0])
+#
+#    for target in ypra:
+#        arm.set_start_state_to_current_state()
+#        #yaw, pitch, roll angles
+#        quaternion = euler_to_quaternion(
+#                math.radians(target[0]),
+#                math.radians(target[1]),
+#                math.radians(target[2]))
+#        logger.info(f"target yaw pitch roll: {target}")
+#        logger.info(f"quaternion raw values: {quaternion}")
+#
+#        pose_goal = PoseStamped()
+#        pose_goal.header.frame_id = "link_base"
+#        pose_goal.pose.orientation.w = quaternion[0]
+#        pose_goal.pose.orientation.x = quaternion[1]
+#        pose_goal.pose.orientation.y = quaternion[2]
+#        pose_goal.pose.orientation.z = quaternion[3]
+#
+#        logger.info(f"pose type: {type(pose_goal.pose.orientation)}")
+#
+#        #these are METERS! don't push your luck
+#        pose_goal.pose.position.x = 0.0
+#        pose_goal.pose.position.y = 0.0
+#        pose_goal.pose.position.z = 0.5
+#        arm.set_goal_state(
+#            # that or joint6_flange maybe?
+#            pose_stamped_msg=pose_goal, pose_link="link6")
+#
+#        # plan to goal
+#        plan_and_execute(moveit, arm, logger)
+#
+
+
     ############################################################################
-    ## Plan 5 - Planning with Multiple Pipelines simultaneously
+    ## Plan Y - Planning with Multiple Pipelines simultaneously
+    ## Not tested yet
     ############################################################################
 
     ## set plan start state to current state
@@ -431,9 +445,7 @@ def main():
     #    sleep_time=8.0,
     #    )
 
-    #code.interact(local=locals())
-
-    print("WE'RE DONE!")
+    logger.info("WE'RE DONE!")
     time.sleep(20)
     time.sleep(20)
     time.sleep(20)
