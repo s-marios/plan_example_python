@@ -9,7 +9,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, ExecuteProcess
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, IfElseSubstitution, EqualsSubstitution, TextSubstitution
 
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
@@ -23,11 +23,19 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
 
-    robot_ip = LaunchConfiguration('robot_ip')
+    robot_ip = LaunchConfiguration('robot_ip', default='fake')
     hw_ns = LaunchConfiguration('hw_ns', default='ufactory')
 
-    lite6_real_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(PathJoinSubstitution([FindPackageShare('xarm_moveit_config'), 'launch', 'lite6_moveit_realmove.launch.py'])),
+
+    movefile = IfElseSubstitution(EqualsSubstitution(
+            robot_ip, TextSubstitution(text='fake')),
+            "lite6_moveit_fake.launch.py",
+            "lite6_moveit_realmove.launch.py",
+            )
+
+
+    lite6_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(PathJoinSubstitution([FindPackageShare('xarm_moveit_config'), 'launch',  movefile])),
         launch_arguments={
             'robot_ip': robot_ip,
             'hw_ns': hw_ns,
@@ -80,8 +88,8 @@ def generate_launch_description():
         [
             spawn_exec_file,
             obj_spawn_node,
-            lite6_real_launch,
             pick_and_place_exec,
+            lite6_launch,
             pick_place_node
             ]
         )
