@@ -71,16 +71,10 @@ def generate_launch_description():
         .to_moveit_configs()
         )
 
-    pick_and_place_exec = DeclareLaunchArgument(
-        "pick_place",
-        default_value="pick_place",
-        description="The main pick and place task",
-        )
-
     pick_place_node = Node(
         name="pick_place_moveit_py",
         package="plan_example_python",
-        executable=LaunchConfiguration("pick_place"),
+        executable="pick_place",
         output="both",
         parameters=[moveit_config.to_dict()],
         )
@@ -89,7 +83,6 @@ def generate_launch_description():
         [
             spawn_exec_file,
             obj_spawn_node,
-            pick_and_place_exec,
             lite6_launch,
             pick_place_node
             ]
