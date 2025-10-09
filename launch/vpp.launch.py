@@ -23,6 +23,12 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
 
+    robot_ip_arg = DeclareLaunchArgument(
+        "robot_ip",
+        default_value="fake",
+        description="Robot IP address to connect to. If left unspecified, a fake robot instance will be created.",
+        )
+
     robot_ip = LaunchConfiguration('robot_ip', default='fake')
     hw_ns = LaunchConfiguration('hw_ns', default='ufactory')
 
@@ -81,6 +87,7 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            robot_ip_arg,
             spawn_exec_file,
             obj_spawn_node,
             lite6_launch,
