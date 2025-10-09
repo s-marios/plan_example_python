@@ -46,6 +46,7 @@ def generate_launch_description():
         "object_spawner_exec",
         default_value="object_spawner",
         description="Spawn virtual objects for the robot to pick up",
+        choices=["object_spawner", "random_object_spawner"]
         )
 
     obj_spawn_node = Node(
