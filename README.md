@@ -34,7 +34,7 @@ where PROJECT_WS is your ROS2 workspace.
 ## Running the moveit example
 
 ```
-ros2 launch plan_example_python motion_planning_python_api_tutorial.launch.py robot_ip:=192.168.1.156
+ros2 launch plan_example_python motion_planning_python_api_tutorial.launch.py
 ```
 
 ## Running the pick and place task
@@ -50,7 +50,11 @@ Information regarding launch arguments can be seen by doing:
  ros2 launch plan_example_python vpp.launch.py --show-args
 ```
 
+## Specifying a robot
+
+Use the `robot_ip:=ROBOT_IP` argument to connect to a real robot. If this argument is omitted, a virtual robot will be used instead.
+
 
 # 3RD PARTY SOFTWARE
 
-This projects makes use of third party software, the details of which can be found in the (LICENSE_3RD_PARTY)[LICENSE_3RD_PARTY] file.
+This projects makes use of third party software, the details of which can be found in the [LICENSE_3RD_PARTY](./LICENSE_3RD_PARTY) file.
