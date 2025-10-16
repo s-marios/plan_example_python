@@ -58,7 +58,13 @@ def generate_launch_description():
         package="plan_example_python",
         executable="pick_place",
         output="both",
-        parameters=[moveit_config.to_dict()],
+        parameters=[
+            moveit_config.to_dict(),
+            {
+                "robot_ip" : LaunchConfiguration("robot_ip"),
+                "add_vacuum_gripper" : LaunchConfiguration("add_vacuum_gripper", default=False )
+            },
+        ],
         )
 
     return LaunchDescription(

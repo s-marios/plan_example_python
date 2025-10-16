@@ -58,10 +58,20 @@ class PickAndPlace():
         self.arm = self.moveit.get_planning_component("lite6")
         self.logger.info("Pick and Place MoveItPy instance created")
 
-        ### Setup a second node and a publisher
+        ### Setup a second node
         self.node = rclpy.create_node("object_despawner")
         self.logger.info("created object despawn node!")
 
+        ## Setup necessary parameters
+        ## vacuum gripper
+        self.node.declare_parameter("add_vacuum_gripper", False)
+        self.vacuum_gripper = self.node.get_parameter("add_vacuum_gripper").get_parameter_value().bool_value
+
+        ## robot_ip
+        self.node.declare_parameter("robot_ip", "fake")
+        self.robot_ip = self.node.get_parameter("robot_ip").get_parameter_value().string_value
+
+        ## Setup necessary pub/sub
         self.publisher = self.node.create_publisher(PlanningScene, "/planning_scene", 10)
         self.subscriber = self.node.create_subscription(
                 PlanningScene,
