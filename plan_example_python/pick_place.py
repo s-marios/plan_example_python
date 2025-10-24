@@ -11,12 +11,12 @@ import code
 import threading
 from queue import SimpleQueue
 
-# generic ros libraries
+# ros imports
 import rclpy
 from rclpy.node import Node
 from rclpy.logging import get_logger
 
-# moveit related library
+# moveit imports
 from moveit.core.robot_state import RobotState
 from moveit.planning import (
     MoveItPy,
@@ -49,6 +49,7 @@ def euler_to_quaternion(yaw, pitch, roll):
 def log_positions(robot_state, logger):
     positions = robot_state.get_joint_group_positions("lite6")
     logger.info(f"positions: {positions}")
+
 
 class RobotLogic():
 
@@ -125,7 +126,6 @@ class RobotLogic():
         self.plan_and_execute()
 
 
-
 class RobotWithoutGripper(RobotLogic):
 
     def __init__(self, moveit, logger, pose_link):
@@ -138,13 +138,13 @@ class RobotWithoutGripper(RobotLogic):
     def move_to_drop_location(self, location: Pose):
         self.move_to(location)
 
+
 class RobotWithVacuumGripper(RobotLogic):
 
-    def __init__(self, moveit, logger, srv_cli):
-         super().__init__(moveit, logger, "link_eef")
+    def __init__(self, moveit, logger, pose_link, srv_cli):
+         super().__init__(moveit, logger, pose_link)
          self.cli = srv_cli
          self.arm = self.moveit.get_planning_component("lite6")
-
 
     def attach_physical_object(self, obj):
         req = VacuumGripperCtrl.Request()
@@ -174,7 +174,6 @@ class PickAndPlace():
 
         # instantiate MoveItPy instance and get planning component
         self.moveit = MoveItPy(node_name="pick_place")
-        #self.arm = self.moveit.get_planning_component("lite6")
         self.logger.info("Pick and Place MoveItPy instance created")
 
         ### Setup a second node
@@ -202,22 +201,31 @@ class PickAndPlace():
 
         self.logger.info(f"CONFIGURATION: vacuum_gripper {self.vacuum_gripper}, robot_ip {self.robot_ip}")
 
+        # setup end effector link
+        if self.vacuum_gripper:
+            self.pose_link = "link_tcp"
+            self.allowed_to_touch = "uflite_vacuum_gripper_link"
+        else:
+            self.pose_link = "link_eef"
+            self.allowed_to_touch = "link6"
+
         # finally initialize appropriate robot logic
-        # TODO: check parameters and instantiate appropriate classes
         if self.vacuum_gripper and self.robot_ip != "fake":
             self.logger.info(f"this is real arm, with vacuum gripper")
             srv_cli = self.node.create_client(VacuumGripperCtrl, "/ufactory/set_vacuum_gripper")
+
             while not srv_cli.wait_for_service(timeout_sec=1.0):
                 self.logger.info(f"waiting for xarm VacuumGripperCtrl to come up")
-            self.robot_logic = RobotWithVacuumGripper(self.moveit, self.logger, srv_cli)
+
+            self.robot_logic = RobotWithVacuumGripper(self.moveit, self.logger, self.pose_link, srv_cli)
+
         elif self.vacuum_gripper and self.robot_ip == "fake":
             self.logger.info(f"we have a fake robot, but with a vacuum gripper")
-            self.robot_logic = RobotWithoutGripper(self.moveit, self.logger, "link_eef")
+            self.robot_logic = RobotWithoutGripper(self.moveit, self.logger, self.pose_link)
+
         else:
             #we have a physical or fake robot without vacuum gripper
-            self.robot_logic = RobotWithoutGripper(self.moveit, self.logger, "link6")
-
-
+            self.robot_logic = RobotWithoutGripper(self.moveit, self.logger, self.pose_link)
 
     def start_spinning(self):
         self.thread = threading.Thread(target=self.spin)
@@ -236,9 +244,8 @@ class PickAndPlace():
     def attach(self, obj: CollisionObject) -> AttachedCollisionObject:
         self.logger.info(f"ATTACHING OBJECT ID: {obj.id}")
 
-
-        # TODO change link6 depending on the parameters
-        obj.header.frame_id = "link6" #relative to the eef
+        # relative to the configured eef
+        obj.header.frame_id = self.pose_link
 
         object_pose = Pose()
         object_pose.position.x = 0.0
@@ -251,9 +258,9 @@ class PickAndPlace():
 
         attached_object = AttachedCollisionObject()
         attached_object.object = obj
-        attached_object.link_name = "link6"
+        attached_object.link_name = self.pose_link
         attached_object.object.operation = CollisionObject.ADD
-        attached_object.touch_links = ["link6"]
+        attached_object.touch_links = [self.allowed_to_touch]
 
         planning_scene = PlanningScene()
         planning_scene.is_diff = True
@@ -263,7 +270,6 @@ class PickAndPlace():
         return attached_object
 
     def detach(self, attached_object: AttachedCollisionObject):
-        # remove the lightsaber
         planning_scene = PlanningScene()
         planning_scene.is_diff = True
         attached_object.object.operation = CollisionObject.REMOVE
@@ -294,7 +300,6 @@ class PickAndPlace():
             pick_location = copy.copy(obj.pose)
             pick_location.position.z += obj.primitives[0].dimensions[SolidPrimitive.BOX_Z]/2.
             self.robot_logic.move_to_object(pick_location)
-            #self.move_to(pick_location)
 
             #step 3: pickup/attach object
             attached_object = self.attach(obj)
@@ -302,7 +307,6 @@ class PickAndPlace():
 
             #step 4: move to drop location
             drop_location.position.z = obj.primitives[0].dimensions[SolidPrimitive.BOX_Z] + 0.01
-            #self.move_to(drop_location)
             self.robot_logic.move_to_drop_location(drop_location)
 
             #step 5: detach
@@ -315,22 +319,17 @@ def extract_objects_from_scene_message(scene: PlanningScene) -> list[CollisionOb
     if scene.is_diff != True:
         return result
 
-
     for obj in scene.world.collision_objects:
         if obj.id.startswith("pick") and obj.operation == CollisionObject.ADD:
             result.append(obj)
 
     return result
 
-def main():
 
-    #############################################################################
-    ### Plan 6 - Attach virtual objects, test raw moveit messages
-    #############################################################################
+def main():
     pick_place = PickAndPlace()
     pick_place.start_spinning()
     pick_place.main_loop()
-
 
 
 if __name__ == "__main__":
