@@ -54,6 +54,17 @@ Information regarding launch arguments can be seen by doing:
 
 Use the `robot_ip:=ROBOT_IP` argument to connect to a real robot. If this argument is omitted, a virtual robot will be used instead.
 
+## Adding a vacuum gripper
+
+To add a vacuum gripper, specify `add_vacuum_gripper:=true` as an argument. It works both with a virtual and a real robot.
+
+For a real gripper, we rely on the services provided by `xarm_api`. You need to enable the `set_vacuum_gripper` service. The simplest way is to:
+
+    * copy the `xarm_ros2/xarm_api/config/xarm_params.yaml` to `xarm_ros2/xarm_api/config/xarm_user_params.yaml`
+    * set the `set_vacuum_gripper` service to `true`
+
+For more details, read the `xarm_api` documentation.
+
 
 # 3RD PARTY SOFTWARE
 
