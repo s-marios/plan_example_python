@@ -30,10 +30,9 @@ def generate_launch_description():
         MoveItConfigsBuilder(
             robot_name="lite6", package_name="plan_example_python"
         )
-        .robot_description(file_path="config/lite6.urdf")
-        .robot_description_semantic(file_path="config/lite6.srdf")
+        .robot_description(file_path="config/lite6_ng.urdf")
+        .robot_description_semantic(file_path="config/lite6_ng.srdf")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
-        #.robot_description_kinematics(file_path="config/kinematics.yaml")
         #we also pulled in all other files (limits, planning.yaml etc) into config
         .moveit_cpp(
             file_path=get_package_share_directory("plan_example_python")
