@@ -29,7 +29,8 @@ setup(
             'plan = plan_example_python.motion_planning_python_api_tutorial:main',
             'object_spawner = plan_example_python.object_spawner:main',
             'random_object_spawner = plan_example_python.random_object_spawner:main',
-            'pick_place = plan_example_python.pick_place:main'
+            'pick_place = plan_example_python.pick_place:main',
+            'img_process  = plan_example_python.img_process:main',
             ],
         },
     )
