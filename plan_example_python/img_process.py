@@ -48,10 +48,7 @@ class ImageProccessor:
         self.logger.info(f"ndpc_rgb.shape is: {ndpc_rgb.shape}, dtype: {ndpc_rgb.dtype}")
 
         if self.count == 0:
-            #out = cv2.imdecode(ndpc_rgb, cv2.IMREAD_COLOR)
-            out = cv2.cvtColor(ndpc_rgb, cv2.COLOR_RGBA2BGR)
-            self.logger.info(f"out.shape is: {out.shape}, dtype: {out.dtype}")
-            cv2.imwrite("/tmp/depth.bmp", out)
+            cv2.imwrite("/tmp/depth.bmp", ndpc_rgb)
 
 
     def sub_color(self, msg: Image):
