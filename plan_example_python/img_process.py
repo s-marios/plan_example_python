@@ -11,6 +11,8 @@ from rclpy.logging import get_logger
 
 from sensor_msgs.msg import PointCloud2, Image
 
+def sortval(a):
+        return a[0]
 
 class ImageProccessor:
 
@@ -20,6 +22,8 @@ class ImageProccessor:
         self.count = 0
         self.br = CvBridge()
         self.back = cv2.createBackgroundSubtractorKNN()
+        self.bd = cv2.createBackgroundSubtractorMOG2(500, 16)
+        self.objectfound = False
 
         self.node.create_subscription(
                 PointCloud2, 
@@ -43,18 +47,59 @@ class ImageProccessor:
         #TODO: why do we have to reshape the array? row/column-major order
         # someone is lying to me
         ndpc_rgb = ndpc['rgb'].reshape(ndpc.shape[1], ndpc.shape[0]).view((np.uint8, 4))
+        #ndpc_x = ndpc['x'].reshape(ndpc.shape[1], ndpc.shape[0])
+        #ndpc_x = cv2.imdecode(ndpc_x, cv2.IMREAD_UNCHANGED)
+        ndpc_x = ndpc['z'].reshape(ndpc.shape[1], ndpc.shape[0])
+        self.logger.info(f"ndpc_x.max is: {ndpc_x.max()}, min: {ndpc_x.min()}")
+        ndpc_x[ ndpc_x < .40 ] = 0
+        ndpc_x[ ndpc_x > .60 ] = 0
+        ndpc_x *= 256 
+        #ndpc_x *= 1024 
+        #ndpc_x *= 4096 
 
         self.logger.info(f"ndpc_rgb.shape is: {ndpc_rgb.shape}, dtype: {ndpc_rgb.dtype}")
+        self.logger.info(f"ndpc_x.shape is: {ndpc_x.shape}, dtype: {ndpc_x.dtype}")
 
-        mask = self.back.apply(ndpc_rgb)
+        if self.count % 5 == 0:
 
-        kernel = np.ones((5, 5), np.uint8)
-        mask_er = cv2.erode(mask, kernel, 1)
+            mask = self.back.apply(ndpc_rgb)
+            depth_mask = self.bd.apply(ndpc_x)
 
-        if self.count == 0:
-            cv2.imwrite("/tmp/depth.bmp", ndpc_rgb)
-            cv2.imwrite("/tmp/mask.bmp", mask)
-            cv2.imwrite("/tmp/mask_er.bmp", mask_er)
+            kernel = np.ones((5, 5), np.uint8)
+            mask_er = cv2.erode(mask, kernel, 1)
+            depth_mask = cv2.erode(depth_mask, kernel, 1)
+
+            #_, threshold_mask = cv2.threshold(depth_mask, 1, 255, cv2.THRESH_BINARY)
+            #contours, h = cv2.findContours(threshold_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            #cimg = cv2.drawContours(depth_mask, contours, -1, (0, 255, 0))
+
+
+            gray = depth_mask
+            #gray = cv2.cvtColor(depth_mask, cv2.COLOR_RGB2GRAY)
+
+            contours, h = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            print(f"gray dtype: {gray.dtype}, shape: {gray.shape}, contour count: {len(contours)}")
+
+            
+            ## visualize the contours
+            rgbgray = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGBA)
+            #img_c = cv2.drawContours(rgbgray, contours, -1, (0, 255, 0, 0), 3)
+
+
+            if contours:
+                sizes = [(cv2.contourArea(c), c) for c in contours]
+                sizes.sort(reverse=True, key=sortval)
+                img_c = cv2.drawContours(rgbgray, [sizes[0][1]], -1, (0, 0, 255), -1)
+                print(f"contour area: {sizes[0][0]}")
+
+            if self.count == 0:
+                cv2.imwrite("/tmp/depth.bmp", ndpc_rgb)
+                cv2.imwrite("/tmp/mask.bmp", mask)
+                cv2.imwrite("/tmp/mask_er.bmp", mask_er)
+                cv2.imwrite("/tmp/depth_x.bmp", ndpc_x)
+                cv2.imwrite("/tmp/mask_depth.bmp", depth_mask)
+                if contours:
+                    cv2.imwrite("/tmp/img_c.bmp", img_c)
 
 
 
