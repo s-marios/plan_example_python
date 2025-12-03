@@ -30,7 +30,7 @@ setup(
             'object_spawner = plan_example_python.object_spawner:main',
             'random_object_spawner = plan_example_python.random_object_spawner:main',
             'pick_place = plan_example_python.pick_place:main',
-            'img_process  = plan_example_python.img_process:main',
+            'depth_camera  = plan_example_python.img_process:main',
             ],
         },
     )

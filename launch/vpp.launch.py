@@ -41,6 +41,20 @@ def prepare_node_config(context: LaunchContext, *args, **kwargs) -> Optional[Lis
         .to_moveit_configs()
         )
 
+    entities = []
+    #attach_xyz = "0.65 0 0"
+    #attach_rpy = "0 0 3.14"
+    if LaunchConfiguration("object_spawner_exec", default="object_spawner").perform(context) == "depth_camera":
+        entities.append(Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            arguments=[
+                '--x', '0', '--y', '0', '--z', '0',
+                '--roll', '0', '--pitch', '0', '--yaw', '0',
+                '--frame-id', 'world', '--child-frame-id', 'camera_link']
+            )
+        )
+
     pick_place_node = Node(
         name="pick_place_moveit_py",
         package="plan_example_python",
@@ -50,12 +64,13 @@ def prepare_node_config(context: LaunchContext, *args, **kwargs) -> Optional[Lis
             moveit_config.to_dict(),
             {
                 "robot_ip" : LaunchConfiguration("robot_ip"),
-                "add_vacuum_gripper" : LaunchConfiguration("add_vacuum_gripper", default=False )
+                "add_vacuum_gripper" : LaunchConfiguration("add_vacuum_gripper", default=False ),
             },
         ],
         )
 
-    return [pick_place_node]
+    entities.append(pick_place_node)
+    return entities
 
 def generate_launch_description():
     common_launch = IncludeLaunchDescription(
@@ -67,7 +82,7 @@ def generate_launch_description():
         "object_spawner_exec",
         default_value="object_spawner",
         description="Spawn virtual objects for the robot to pick up",
-        choices=["object_spawner", "random_object_spawner"]
+        choices=["object_spawner", "random_object_spawner", "depth_camera"]
         )
 
     obj_spawn_node = Node(

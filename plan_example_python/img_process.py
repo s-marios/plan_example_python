@@ -10,7 +10,10 @@ import rclpy
 from rclpy.node import Node
 from rclpy.logging import get_logger
 
+from geometry_msgs.msg import Pose
 from sensor_msgs.msg import PointCloud2, Image
+from moveit_msgs.msg import CollisionObject, AttachedCollisionObject, PlanningScene, ObjectColor
+from shape_msgs.msg import SolidPrimitive
 
 AREA_THRESHOLD = 2000
 BG_INIT_FRAME_COUNT = 20
@@ -27,6 +30,7 @@ class ImageProcessor:
         self.depth_bg = cv2.createBackgroundSubtractorMOG2(500, 16)
         self.objectfound = False
         self.bg_init_frame_count = 0
+        self.objid = 0
 
         # Pointer to pointcloud processing function
         self.process_pc = self.bg_initialize
@@ -35,6 +39,14 @@ class ImageProcessor:
                 PointCloud2, 
                 "/camera/depth_registered/points", 
                 self.callback, 10)
+
+        self.node.create_subscription(
+                PlanningScene,
+                "/planning_scene",
+                self.scene_changed_callback,
+                10)
+
+        self.publisher = self.node.create_publisher(PlanningScene, "/planning_scene", 10)
 
     def callback(self, msg: PointCloud2):
         self.process_pc(msg)
@@ -202,6 +214,63 @@ class ImageProcessor:
         stats = [compute_stats(buff) for buff in [masked_depth, masked_width, masked_height]]
         for (stat, dimension) in zip(stats, ["depth", "width", "height"]):
             print(f"dimension: {dimension}, avg/min/max/diff: {stat}")
+
+
+        self.objid += 1
+        dim = [float(abs(stat[3])) for stat in stats]
+        # translate from camera coord to world coord
+        pos = [float(stats[0][0]), float(-stats[1][0]), float(-stats[2][0])]
+        obj = self.create_object(object_id=f"pick_{self.objid}", dimensions=dim, position=pos)
+        self.publish_object(obj)
+
+
+    #ROS2 related methods
+    def create_object(
+            self,
+            object_id = "my_object",
+            dimensions = [0.03, 0.03, 0.16],
+            position = [0.2, -0.2, 0.8]) -> CollisionObject:
+        collision_object = CollisionObject()
+        collision_object.header.frame_id = "world" #we're spawning things in world coordinates
+        collision_object.id = object_id
+
+        primitive = SolidPrimitive()
+        primitive.type = SolidPrimitive.BOX
+        primitive.dimensions = dimensions
+        collision_object.primitives.append(primitive)
+
+        object_pose = Pose()
+        object_pose.position.x = position[0]
+        object_pose.position.y = position[1]
+        object_pose.position.z = position[2]
+        #collision_object.primitive_poses.append(object_pose)
+        collision_object.pose = object_pose
+        collision_object.operation = CollisionObject.ADD
+        return collision_object
+
+    def publish_object(self, obj: CollisionObject, color: ObjectColor = None):
+        planning_scene = PlanningScene()
+        planning_scene.is_diff = True
+        planning_scene.world.collision_objects.append(obj)
+
+        if color:
+            planning_scene.object_colors.append(color)
+
+        self.publisher.publish(planning_scene)
+        rclpy.spin_once(self.node, timeout_sec=1.0)
+        self.logger.info("spawned an object!")
+
+    def scene_changed_callback(self, msg: PlanningScene):
+        self.logger.info("TODO: scene changed!")
+
+        if msg.is_diff is False:
+            return
+
+        for obj in msg.world.collision_objects:
+            if obj.operation == CollisionObject.REMOVE and obj.id.startswith("pick"):
+                self.logger.info(f"object {obj.id} was removed from the scene!")
+                self.process_pc = self.detect_object
+
 
 
 def main():
