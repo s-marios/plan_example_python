@@ -101,7 +101,7 @@ class RobotLogic():
 
         time.sleep(sleep_time)
 
-    def move_to(self, obj_pose: Pose):
+    def move_to(self, obj_pose: Pose, frame: str = "world"):
         self.logger.info(f"object coordinates: {
                                obj_pose.position.x,
                                obj_pose.position.y,
@@ -109,7 +109,7 @@ class RobotLogic():
 
         self.arm.set_start_state_to_current_state()
         pose_goal = PoseStamped()
-        pose_goal.header.frame_id = "world"
+        pose_goal.header.frame_id = frame
 
         q = euler_to_quaternion(math.radians(0), math.radians(180), math.radians(0))
 
@@ -136,7 +136,7 @@ class RobotWithoutGripper(RobotLogic):
          self.move_to(obj_pose)
 
     def move_to_drop_location(self, location: Pose):
-        self.move_to(location)
+        self.move_to(location, "link_base")
 
 
 class RobotWithVacuumGripper(RobotLogic):
@@ -163,7 +163,7 @@ class RobotWithVacuumGripper(RobotLogic):
          self.move_to(obj_pose)
 
     def move_to_drop_location(self, location: Pose):
-        self.move_to(location)
+        self.move_to(location, "link_base")
 
 
 class PickAndPlace():
