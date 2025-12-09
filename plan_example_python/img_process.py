@@ -223,7 +223,7 @@ class ImageProcessor:
 
 
         self.objid += 1
-        dim = [float(abs(stat[3])) for stat in stats]
+        dim = [float(max(abs(stat[3]), 0.05)) for stat in stats]
         # translate from camera coord to world coord
         pos = [float(stats[0][0]), float(-stats[1][0]), float(-stats[2][0])]
         obj = self.create_object(object_id=f"pick_{self.objid}", dimensions=dim, position=pos)
