@@ -12,6 +12,9 @@ response_adapters:
   - default_planning_response_adapters/DisplayMotionPath
 default_request_adapter_parameters:
   fix_start_state: true
+lite6:
+   enforce_constrained_state_space: true
+   projection_evaluator: joints(joint1, joint2)
 
 #AI hallucinations? investigate furter
 #adapter_plugins:
