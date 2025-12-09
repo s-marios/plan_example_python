@@ -19,6 +19,8 @@ AREA_THRESHOLD = 2000
 BG_INIT_FRAME_COUNT = 20
 STABLE_FRAME_COUNT = 20
 AREA_DIFF_RATIO = 0.03 #i.e. 3%
+PLANE_CUTOFF_NEAR = 0.4
+PLANE_CUTOFF_FAR = 0.6
 
 class ImageProcessor:
 
@@ -60,8 +62,8 @@ class ImageProcessor:
 
     def process_depth_buffer(depth: np.ndarray) -> np.ndarray:
         dres = depth.copy()
-        dres[ dres < .40] = 0
-        dres[ dres > .60] = 0
+        dres[ dres < PLANE_CUTOFF_NEAR] = 0
+        dres[ dres > PLANE_CUTOFF_FAR] = 0
         dres *= 256
         #todo: better scaling?? go full blast perhaps?
         return dres
@@ -195,6 +197,10 @@ class ImageProcessor:
         masked_width = width[pixelpoints]
         masked_height = height[pixelpoints]
 
+        #2.5 apply plane cutoff to depth
+        pass1_depth = masked_depth[masked_depth > PLANE_CUTOFF_NEAR]
+        cut_depth = pass1_depth[pass1_depth < PLANE_CUTOFF_FAR]
+
 
         #3. pretty pictures
         rgb_cont = cv2.drawContours(rgb.copy(), [contour_tuple[1]], 0, (0, 0, 255), 3)
@@ -211,7 +217,7 @@ class ImageProcessor:
             return (buff.mean(), buff_min, buff_max, buff_max - buff_min)
 
         #4. for each of those, compute min,max,avg,spread
-        stats = [compute_stats(buff) for buff in [masked_depth, masked_width, masked_height]]
+        stats = [compute_stats(buff) for buff in [cut_depth, masked_width, masked_height]]
         for (stat, dimension) in zip(stats, ["depth", "width", "height"]):
             print(f"dimension: {dimension}, avg/min/max/diff: {stat}")
 
