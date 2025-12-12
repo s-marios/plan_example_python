@@ -10,6 +10,10 @@ response_adapters:
   - default_planning_response_adapters/ValidateSolution
   - default_planning_response_adapters/DisplayMotionPath
 
+default_request_adapter_parameters:
+  fix_start_state: true
+  default_workspace_bounds: 1.5
+
 stomp_moveit:
   num_timesteps: 60
   num_iterations: 40

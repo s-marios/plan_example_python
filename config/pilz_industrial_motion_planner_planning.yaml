@@ -9,6 +9,9 @@ request_adapters:
 response_adapters:
   - default_planning_response_adapters/ValidateSolution
   - default_planning_response_adapters/DisplayMotionPath
-capabilities: >-
-    pilz_industrial_motion_planner/MoveGroupSequenceAction
-    pilz_industrial_motion_planner/MoveGroupSequenceService
+default_request_adapter_parameters:
+  fix_start_state: true
+  default_workspace_bounds: 1.5
+capabilities:
+  - pilz_industrial_motion_planner/MoveGroupSequenceAction
+  - pilz_industrial_motion_planner/MoveGroupSequenceService

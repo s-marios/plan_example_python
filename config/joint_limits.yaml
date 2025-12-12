@@ -17,6 +17,9 @@ joint_limits:
     max_velocity: 2.14
     has_acceleration_limits: true
     max_acceleration: 10.0
+    #marios: joint3 puts us in unpleasant positions
+    #HOWEVER: this joint position destroys OMPL and it can't find solutions!
+    #max_position: 0.78539
   joint4:
     has_velocity_limits: true
     max_velocity: 2.14
