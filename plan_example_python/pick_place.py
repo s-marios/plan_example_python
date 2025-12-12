@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-A script to outline the fundamentals of the moveit_py motion planning API.
-"""
 
 # core python libraries
 import time
@@ -25,7 +22,11 @@ from moveit.planning import (
 
 # ros2 messages
 from geometry_msgs.msg import Pose, PoseStamped
-from moveit_msgs.msg import CollisionObject, AttachedCollisionObject, PlanningScene
+from moveit_msgs.msg import (
+    CollisionObject, AttachedCollisionObject, PlanningScene,
+    Constraints, OrientationConstraint, PositionConstraint,
+    )
+
 from shape_msgs.msg import SolidPrimitive
 
 # xarm messages
@@ -57,6 +58,60 @@ class RobotLogic():
         self.moveit = moveit
         self.logger = logger
         self.pose_link = pose_link
+        self.no_constraints = Constraints()
+        self.multi_params = MultiPipelinePlanRequestParameters(
+                #the names of the planners reflect those in
+                #motion_planning_python_api_tutorial.yaml
+                moveit, ["ompl_rrtc", "pilz_ptp", "pilz_lin", "ompl_rrt_star", "stomp_planner"])
+
+
+    def get_orientation_constraint(pose_link) -> OrientationConstraint:
+        down =  OrientationConstraint()
+        down.header.frame_id = "world"
+        down.link_name = pose_link
+
+        # looking downwards
+        q = euler_to_quaternion(math.radians(0), math.radians(180), math.radians(0))
+
+        down.orientation.w = q[0]
+        down.orientation.x = q[1]
+        down.orientation.y = q[2]
+        down.orientation.z = q[3]
+
+        down.absolute_x_axis_tolerance = 0.314
+        down.absolute_y_axis_tolerance = 0.314
+        down.absolute_z_axis_tolerance = 3.14
+        #default
+        down.parameterization = OrientationConstraint.XYZ_EULER_ANGLES
+
+        down.weight = 1.0
+
+        return down
+
+    def create_position_constraint(pose_link: str, goal: Pose) -> PositionConstraint:
+
+        #setup bounding volume
+        bv = PositionConstraint()
+        bv.header.frame_id = "world"
+        bv.link_name = pose_link
+
+        box_pose = Pose()
+        box_pose.orientation.x = 0.0
+        box_pose.orientation.y = 0.0
+        box_pose.orientation.z = 0.0
+        box_pose.orientation.w = 1.0
+        box_pose.position = goal.position
+
+        box = SolidPrimitive()
+        box.type = SolidPrimitive.BOX
+        box.dimensions = [.2, .2, .2]
+
+        bv.constraint_region.primitive_poses.append(box_pose)
+        bv.constraint_region.primitives.append(box)
+
+        bv.weight = 0.9
+
+        return bv
 
     def attach_physical_object(self, obj):
         pass
@@ -83,6 +138,7 @@ class RobotLogic():
             plan_result = self.arm.plan(
                 multi_plan_parameters=multi_plan_parameters
                 )
+            self.logger.info("HITTING THE MULTI PARAMS!")
         elif single_plan_parameters is not None:
             plan_result = self.arm.plan(
                 single_plan_parameters=single_plan_parameters
@@ -101,7 +157,7 @@ class RobotLogic():
 
         time.sleep(sleep_time)
 
-    def move_to(self, obj_pose: Pose, frame: str = "world"):
+    def move_to(self, obj_pose: Pose, frame: str = "world", constraints: Constraints = None):
         self.logger.info(f"object coordinates: {
                                obj_pose.position.x,
                                obj_pose.position.y,
@@ -122,8 +178,14 @@ class RobotLogic():
         pose_goal.pose.position.y = obj_pose.position.y
         pose_goal.pose.position.z = obj_pose.position.z
 
-        self.arm.set_goal_state(pose_stamped_msg=pose_goal, pose_link=self.pose_link)
-        self.plan_and_execute()
+        if constraints is None:
+            constraints = self.no_constraints
+
+        self.arm.set_path_constraints(constraints)
+        self.arm.set_goal_state(
+                pose_stamped_msg=pose_goal,
+                pose_link=self.pose_link,)
+        self.plan_and_execute(multi_plan_parameters=self.multi_params)
 
 
 class RobotWithoutGripper(RobotLogic):
@@ -142,16 +204,18 @@ class RobotWithoutGripper(RobotLogic):
 class RobotWithVacuumGripper(RobotLogic):
 
     def __init__(self, moveit, logger, pose_link, srv_cli):
-         super().__init__(moveit, logger, pose_link)
-         self.cli = srv_cli
-         self.arm = self.moveit.get_planning_component("lite6")
+        super().__init__(moveit, logger, pose_link)
+        self.cli = srv_cli
+        self.arm = self.moveit.get_planning_component("lite6")
+        #self.constraints = RobotLogic.setup_constraints(pose_link)
+        self.no_constraints = Constraints()
+        self.orientation_constraint = RobotLogic.get_orientation_constraint(pose_link)
 
     def attach_physical_object(self, obj):
         req = VacuumGripperCtrl.Request()
         req.on = True
         req.wait = True
         res = self.cli.call(req)
-        #TODO: check result
 
     def detach_physical_object(self):
         req = VacuumGripperCtrl.Request()
@@ -159,11 +223,30 @@ class RobotWithVacuumGripper(RobotLogic):
         req.wait = True
         res = self.cli.call(req)
 
-    def move_to_object(self, obj_pose: Pose):
-         self.move_to(obj_pose)
+    def move_to_object(self, goal: Pose):
+        #first half - approach the object from above
+        goal.position.z += 0.02
+        self.move_to(goal)
+
+        #second half - lower eef onto the object
+        goal.position.z -= 0.02
+        self.move_to(goal)
+
+        #keep a reference to the location of the object to use later
+        self.obj_location = goal
 
     def move_to_drop_location(self, location: Pose):
-        self.move_to(location, "link_base")
+        #lift object
+        self.obj_location.position.z += 0.05
+        self.move_to(self.obj_location)
+
+        #approach drop location
+        location.position.z += 0.05
+        self.move_to(location, frame="link_base")
+
+        #at specified drop location
+        location.position.z -= 0.05
+        self.move_to(location, frame="link_base")
 
 
 class PickAndPlace():
