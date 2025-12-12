@@ -23,9 +23,13 @@ def prepare_node_config(context: LaunchContext, *args, **kwargs) -> Optional[Lis
     urdf="config/lite6_ng.urdf"
     srdf="config/lite6_ng.srdf"
     add_vacuum_gripper_string = LaunchConfiguration("add_vacuum_gripper", default="false").perform(context).lower()
+    object_spawner_exec_is_depth_camera = LaunchConfiguration("object_spawner_exec", default="object_spawner").perform(context) == "depth_camera"
+
     if add_vacuum_gripper_string == "true":
         urdf="config/lite6_vg.urdf"
         srdf="config/lite6_vg.srdf"
+        if object_spawner_exec_is_depth_camera:
+            urdf="config/lite6_vg_displaced.urdf"
 
     moveit_config = (
         MoveItConfigsBuilder(
@@ -42,15 +46,13 @@ def prepare_node_config(context: LaunchContext, *args, **kwargs) -> Optional[Lis
         )
 
     entities = []
-    #attach_xyz = "0.65 0 0"
-    #attach_rpy = "0 0 3.14"
-    if LaunchConfiguration("object_spawner_exec", default="object_spawner").perform(context) == "depth_camera":
+    if object_spawner_exec_is_depth_camera:
         entities.append(Node(
             package='tf2_ros',
             executable='static_transform_publisher',
             arguments=[
-                '--x', '0', '--y', '0', '--z', '0',
-                '--roll', '0', '--pitch', '0', '--yaw', '0',
+                '--x', '0.0', '--y', '0.0', '--z', '0.0',
+                '--roll', '0.0', '--pitch', '0.0', '--yaw', '0.0',
                 '--frame-id', 'world', '--child-frame-id', 'camera_link']
             )
         )
@@ -65,6 +67,10 @@ def prepare_node_config(context: LaunchContext, *args, **kwargs) -> Optional[Lis
             {
                 "robot_ip" : LaunchConfiguration("robot_ip"),
                 "add_vacuum_gripper" : LaunchConfiguration("add_vacuum_gripper", default=False ),
+                "default_request_adapter_parameters": {
+                    "fix_start_state": True,
+                    "default_workspace_bounds": 1.5
+                },
             },
         ],
         )
