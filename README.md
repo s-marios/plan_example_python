@@ -29,7 +29,7 @@ After you have successfully built the project, source the appropriate overlay:
 source PROJECT_WS/install/setup.bash
 ```
 
-where PROJECT_WS is your ROS2 workspace.
+where `PROJECT_WS` is your ROS2 workspace.
 
 ## Running the moveit example
 
@@ -60,8 +60,8 @@ To add a vacuum gripper, specify `add_vacuum_gripper:=true` as an argument. It w
 
 For a real gripper, we rely on the services provided by `xarm_api`. You need to enable the `set_vacuum_gripper` service. The simplest way is to:
 
-    * copy the `xarm_ros2/xarm_api/config/xarm_params.yaml` to `xarm_ros2/xarm_api/config/xarm_user_params.yaml`
-    * set the `set_vacuum_gripper` service to `true`
+* copy the `xarm_ros2/xarm_api/config/xarm_params.yaml` to `xarm_ros2/xarm_api/config/xarm_user_params.yaml`
+* set the `set_vacuum_gripper` service to `true`
 
 For more details, read the `xarm_api` documentation.
 
