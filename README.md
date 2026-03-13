@@ -65,6 +65,15 @@ For a real gripper, we rely on the services provided by `xarm_api`. You need to 
 
 For more details, read the `xarm_api` documentation.
 
+## Unity Branch
+
+Ensure that you have the package [demo_planning_msgs](https://github.com/s-marios/demo_planning_msgs) in your workspace. 
+
+After building your workspace, you can launch the `moveit` planning service as follows:
+
+```
+ros2 launch plan_example_python planning_service.launch.py
+```
 
 # 3RD PARTY SOFTWARE
 
